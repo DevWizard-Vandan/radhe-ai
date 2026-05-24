@@ -1,0 +1,20 @@
+# Rust / Cargo
+/target
+Cargo.lock
+
+# Radhe AI Specifics
+# Local models
+/models/
+*.gguf
+
+# Local app data directories
+/.radhe/
+/installer/
+
+# Downloaded llama binaries and directories
+/llama-*/
+/llama-b9305-bin-win-cpu-x64/
+
+# Temporary and test files
+out.txt
+test.txt
