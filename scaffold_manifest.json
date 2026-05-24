@@ -1,0 +1,12 @@
+{
+  "files": [
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.md",
+    "Cargo.toml",
+    "README.md",
+    "installer/install.ps1",
+    "installer/install.sh",
+    "src/main.rs"
+  ]
+}
