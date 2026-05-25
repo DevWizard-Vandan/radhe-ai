@@ -23,7 +23,7 @@ Security updates are actively applied to the following versions:
 
 If you discover a security vulnerability (such as a local privilege escalation, command injection, or directory traversal risk in path resolution), please do not open a public GitHub Issue. Instead, report it privately to:
 
-* **Contact Email**: [vandansharma@example.com](mailto:vandansharma@example.com)
+* **Contact Email**: [vandansharma2006@gmail.com](mailto:vandansharma2006@gmail.com)
 
 Please include:
 1. A detailed description of the vulnerability.
