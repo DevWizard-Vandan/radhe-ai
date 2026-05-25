@@ -190,13 +190,15 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         .join(format!("{model}.gguf"));
     let model_path = model_path.to_string_lossy().into_owned();
 
+    let prompt_with_delim = format!("{}\n\n### RESPONSE:\n", prompt);
+
     let max_tokens_str = max_tokens.to_string();
     let child = Command::new("llama-completion.exe")
         .args([
             "-m",
             &model_path,
             "-p",
-            prompt,
+            &prompt_with_delim,
             "-n",
             &max_tokens_str,
             "-no-cnv",
@@ -237,42 +239,62 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
 
     let cleaned_content = cleaned_lines.join("\n");
 
-    // Strip the echoed prompt from the beginning
-    let prompt_normalized = prompt
-        .replace("\r\n", "\n")
-        .replace("\\n", "\n")
-        .replace("\\r", "\r")
-        .replace("\\t", "\t");
-    let trimmed_prompt_normalized = prompt.trim()
-        .replace("\r\n", "\n")
-        .replace("\\n", "\n")
-        .replace("\\r", "\r")
-        .replace("\\t", "\t");
-    let end_pos = cleaned_content.find(&prompt_normalized)
-        .map(|p| p + prompt_normalized.len())
-        .or_else(|| cleaned_content.find(&trimmed_prompt_normalized).map(|p| p + trimmed_prompt_normalized.len()))
-        .unwrap_or(0);
-
-    let rest = &cleaned_content[end_pos..];
-    
-    let response = if let Some(first_newline_idx) = rest.find('\n') {
-        let before_newline = &rest[..first_newline_idx];
-        if before_newline.trim().is_empty() {
-            &rest[first_newline_idx + 1..]
+    let cleaned = if let Some(pos) = cleaned_content.find("### RESPONSE:") {
+        let rest = &cleaned_content[pos + "### RESPONSE:".len()..];
+        let response = if let Some(first_newline_idx) = rest.find('\n') {
+            let before_newline = &rest[..first_newline_idx];
+            if before_newline.trim().is_empty() {
+                &rest[first_newline_idx + 1..]
+            } else {
+                rest
+            }
         } else {
             rest
-        }
+        };
+        response.to_string()
     } else {
-        rest
-    };
+        // Fall back to current stripping logic
+        let prompt_normalized = prompt
+            .replace("\r\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t");
+        let trimmed_prompt_normalized = prompt.trim()
+            .replace("\r\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t");
+        let end_pos = cleaned_content.find(&prompt_normalized)
+            .map(|p| p + prompt_normalized.len())
+            .or_else(|| cleaned_content.find(&trimmed_prompt_normalized).map(|p| p + trimmed_prompt_normalized.len()))
+            .unwrap_or(0);
 
-    let cleaned = response.to_string();
+        let rest = &cleaned_content[end_pos..];
+        let response = if let Some(first_newline_idx) = rest.find('\n') {
+            let before_newline = &rest[..first_newline_idx];
+            if before_newline.trim().is_empty() {
+                &rest[first_newline_idx + 1..]
+            } else {
+                rest
+            }
+        } else {
+            rest
+        };
+        response.to_string()
+    };
 
     let mut final_lines = Vec::new();
     for line in cleaned.lines() {
         let line_trimmed = line.trim();
         if mode == "code" {
-            if line_trimmed.starts_with("Explanation:") || line_trimmed.starts_with("explanation:") || line_trimmed.contains("[end of text]") {
+            if line_trimmed.starts_with("Explanation:")
+                || line_trimmed.starts_with("explanation:")
+                || line_trimmed.starts_with("// Explanation")
+                || line_trimmed.starts_with("// explanation")
+                || line_trimmed.starts_with("# Explanation")
+                || line_trimmed.starts_with("# explanation")
+                || line_trimmed.contains("[end of text]")
+            {
                 break;
             }
             if line_trimmed == "```cpp" || line_trimmed == "```" || line_trimmed == "```c" {
