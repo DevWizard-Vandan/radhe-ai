@@ -27,7 +27,7 @@ struct Cli {
     notes: Option<String>,
 
     #[arg(long, value_name = "FILE")]
-    fix: Option<PathBuf>,
+    fix: Option<String>,
 
     #[arg(long, default_value = "qwen2")]
     model: String,
@@ -75,7 +75,7 @@ fn main() -> Result<()> {
         "code" => 300,
         "explain" => 200,
         "notes" => 150,
-        "fix" => 300,
+        "fix" => 400,
         _ => cli.max_tokens,
     };
     let output = run_inference(&prompt, &cli.model, max_tokens, mode)
@@ -143,11 +143,30 @@ Task: {task_str}"
         ));
     }
 
-    if let Some(file) = &cli.fix {
-        let code = fs::read_to_string(file)
-            .with_context(|| format!("unable to read file: {}", file.display()))?;
+    if let Some(file_path_str) = &cli.fix {
+        let path = PathBuf::from(file_path_str);
+        if !path.exists() {
+            anyhow::bail!("File not found: {file_path_str}. Please provide a valid file path.");
+        }
+        let code = fs::read_to_string(&path)
+            .with_context(|| format!("unable to read file: {file_path_str}"))?;
+
+        let ext_lower = path.extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+
+        let language = match ext_lower.as_str() {
+            "c" => "C",
+            "cpp" => "C++",
+            "py" => "Python",
+            "rs" => "Rust",
+            "java" => "Java",
+            _ => "code",
+        };
+
         return Ok(format!(
-            "Fix the code below. Return ONLY the corrected code.
+            "You are a code debugger. Fix ALL bugs in this {language} code. Return ONLY the corrected code with zero explanation. No markdown, no backticks.
 
 {code}"
         ));
@@ -219,10 +238,19 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
     let cleaned_content = cleaned_lines.join("\n");
 
     // Strip the echoed prompt from the beginning
-    let trimmed_prompt = prompt.trim();
-    let end_pos = cleaned_content.find(prompt)
-        .map(|p| p + prompt.len())
-        .or_else(|| cleaned_content.find(trimmed_prompt).map(|p| p + trimmed_prompt.len()))
+    let prompt_normalized = prompt
+        .replace("\r\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t");
+    let trimmed_prompt_normalized = prompt.trim()
+        .replace("\r\n", "\n")
+        .replace("\\n", "\n")
+        .replace("\\r", "\r")
+        .replace("\\t", "\t");
+    let end_pos = cleaned_content.find(&prompt_normalized)
+        .map(|p| p + prompt_normalized.len())
+        .or_else(|| cleaned_content.find(&trimmed_prompt_normalized).map(|p| p + trimmed_prompt_normalized.len()))
         .unwrap_or(0);
 
     let rest = &cleaned_content[end_pos..];
