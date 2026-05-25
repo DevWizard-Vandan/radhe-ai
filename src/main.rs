@@ -166,9 +166,11 @@ Task: {task_str}"
         };
 
         return Ok(format!(
-            "You are a code debugger. Fix ALL bugs in this {language} code. Return ONLY the corrected code with zero explanation. No markdown, no backticks.
-
-{code}"
+            "You are a C/{} compiler and debugger. The following code has syntax errors and logic bugs. Rewrite it completely with ALL bugs fixed. Output ONLY the fixed code. No explanations, no comments about what was fixed, no markdown fences.
+BROKEN CODE:
+{}
+FIXED CODE:\n",
+            language, code
         ));
     }
 
@@ -190,7 +192,11 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         .join(format!("{model}.gguf"));
     let model_path = model_path.to_string_lossy().into_owned();
 
-    let prompt_with_delim = format!("{}\n\n### RESPONSE:\n", prompt);
+    let prompt_with_delim = if mode == "fix" {
+        prompt.to_string()
+    } else {
+        format!("{}\n\n### RESPONSE:\n", prompt)
+    };
 
     let max_tokens_str = max_tokens.to_string();
     let child = Command::new("llama-completion.exe")
@@ -252,6 +258,19 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
             rest
         };
         response.to_string()
+    } else if let Some(pos) = cleaned_content.find("FIXED CODE:") {
+        let rest = &cleaned_content[pos + "FIXED CODE:".len()..];
+        let response = if let Some(first_newline_idx) = rest.find('\n') {
+            let before_newline = &rest[..first_newline_idx];
+            if before_newline.trim().is_empty() {
+                &rest[first_newline_idx + 1..]
+            } else {
+                rest
+            }
+        } else {
+            rest
+        };
+        response.to_string()
     } else {
         // Fall back to current stripping logic
         let prompt_normalized = prompt
@@ -285,26 +304,33 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
 
     let mut final_lines = Vec::new();
     for line in cleaned.lines() {
-        let line_trimmed = line.trim();
-        if mode == "code" {
+        let line_clean = line.replace("[end of text]", "");
+        let line_trimmed = line_clean.trim();
+
+        if line_trimmed == "```c"
+            || line_trimmed == "```cpp"
+            || line_trimmed == "```python"
+            || line_trimmed == "```rust"
+            || line_trimmed == "```"
+        {
+            continue;
+        }
+
+        if mode == "code" || mode == "fix" {
             if line_trimmed.starts_with("Explanation:")
                 || line_trimmed.starts_with("explanation:")
                 || line_trimmed.starts_with("// Explanation")
                 || line_trimmed.starts_with("// explanation")
                 || line_trimmed.starts_with("# Explanation")
                 || line_trimmed.starts_with("# explanation")
-                || line_trimmed.contains("[end of text]")
             {
                 break;
             }
-            if line_trimmed == "```cpp" || line_trimmed == "```" || line_trimmed == "```c" {
-                continue;
-            }
         }
-        if line.is_empty() {
+        if line_trimmed.is_empty() {
             continue;
         }
-        final_lines.push(line);
+        final_lines.push(line_clean);
     }
     let final_cleaned = final_lines.join("\n");
 
