@@ -151,6 +151,16 @@ Task: {task_str}"
         let code = fs::read_to_string(&path)
             .with_context(|| format!("unable to read file: {file_path_str}"))?;
 
+        // Strip any line containing // bug: or # bug: before building the prompt
+        let cleaned_code_lines: Vec<&str> = code
+            .lines()
+            .filter(|line| {
+                let line_lower = line.to_lowercase();
+                !line_lower.contains("// bug:") && !line_lower.contains("# bug:")
+            })
+            .collect();
+        let cleaned_code = cleaned_code_lines.join("\n");
+
         let ext_lower = path.extension()
             .and_then(|s| s.to_str())
             .map(|s| s.to_lowercase())
@@ -170,7 +180,7 @@ Task: {task_str}"
 BROKEN CODE:
 {}
 FIXED CODE:\n",
-            language, code
+            language, cleaned_code
         ));
     }
 
