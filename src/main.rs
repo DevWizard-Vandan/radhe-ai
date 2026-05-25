@@ -353,7 +353,54 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         }
         final_lines.push(line_clean);
     }
-    let final_cleaned = final_lines.join("\n");
+    let mut final_cleaned = final_lines.join("\n");
+
+    if mode == "notes" {
+        let mut seen_bullets = std::collections::HashSet::new();
+        let mut deduplicated_lines = Vec::new();
+        for line in final_lines {
+            let line_trimmed = line.trim();
+            if line_trimmed.is_empty() {
+                continue;
+            }
+            let mut core = line.to_lowercase();
+            core = core.replace("**", "");
+            
+            let mut trimmed_core = core.trim();
+            loop {
+                let prev_len = trimmed_core.len();
+                if trimmed_core.starts_with('-') || trimmed_core.starts_with('*') {
+                    trimmed_core = trimmed_core[1..].trim();
+                }
+                
+                let mut has_digit_prefix = false;
+                let mut digit_end = 0;
+                for (i, c) in trimmed_core.char_indices() {
+                    if c.is_ascii_digit() {
+                        digit_end = i + c.len_utf8();
+                    } else if c == '.' && digit_end > 0 {
+                        trimmed_core = trimmed_core[i + c.len_utf8()..].trim();
+                        has_digit_prefix = true;
+                        break;
+                    } else {
+                        break;
+                    }
+                }
+                
+                if trimmed_core.len() == prev_len && !has_digit_prefix {
+                    break;
+                }
+            }
+            
+            let core_text = trimmed_core.to_string();
+            if seen_bullets.contains(&core_text) {
+                continue;
+            }
+            seen_bullets.insert(core_text);
+            deduplicated_lines.push(line);
+        }
+        final_cleaned = deduplicated_lines.join("\n");
+    }
 
     Ok(final_cleaned.trim().to_string())
 }
