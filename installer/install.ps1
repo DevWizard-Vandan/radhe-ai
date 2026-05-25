@@ -20,10 +20,21 @@ try {
     Write-Host "Downloading radhe.exe from $RadheUrl..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $RadheUrl -OutFile $RadheDest -ShowProgress
 
-    # 3. Download llama.cpp zip
-    $LlamaUrl = "https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-b9305-bin-win-cpu-x64.zip"
+    # 3. Get latest llama.cpp release asset dynamically
+    $LlamaReleaseUrl = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+    Write-Host "Fetching latest llama.cpp release info..." -ForegroundColor Yellow
+    $LlamaRelease = Invoke-RestMethod -Uri $LlamaReleaseUrl
+    
+    $LlamaAsset = $LlamaRelease.assets | Where-Object { $_.name -like "*bin-win-cpu-x64.zip" }
+    if ($null -eq $LlamaAsset) {
+        throw "Could not find latest llama.cpp CPU build matching *bin-win-cpu-x64.zip in release assets."
+    }
+
+    $LlamaUrl = $LlamaAsset.browser_download_url
+    $LlamaZipName = $LlamaAsset.name
     $LlamaZip = Join-Path $env:TEMP "llama.zip"
-    Write-Host "Downloading llama.cpp zip from $LlamaUrl..." -ForegroundColor Yellow
+    
+    Write-Host "Downloading latest llama.cpp zip ($LlamaZipName) from $LlamaUrl..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $LlamaUrl -OutFile $LlamaZip -ShowProgress
 
     # 4. Extract llama-completion.exe and dll files
