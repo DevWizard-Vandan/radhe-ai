@@ -59,6 +59,17 @@ fn main() -> Result<()> {
         None => {}
     }
 
+    let is_repl = cli.prompt.is_none()
+        && cli.code.is_none()
+        && cli.explain.is_none()
+        && cli.notes.is_none()
+        && cli.fix.is_none();
+
+    if is_repl {
+        run_repl(&cli.model)?;
+        return Ok(());
+    }
+
     let prompt = build_prompt(&cli)?;
     let mode = if cli.code.is_some() {
         "code"
@@ -375,4 +386,133 @@ fn run_doctor() {
         println!("- Expected model path: unable to resolve home directory");
         println!("  MISSING: download model to ~/.radhe/models/qwen2.gguf");
     }
+}
+
+fn run_repl(model: &str) -> Result<()> {
+    use colored::Colorize;
+    use std::io::{self, BufRead, Write};
+
+    // Set up Ctrl+C handler with a friendly cyan/yellow exit message
+    ctrlc::set_handler(move || {
+        println!("\n\n{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+        std::process::exit(0);
+    })
+    .context("Error setting Ctrl-C handler")?;
+
+    // Print welcome header
+    println!("{}", "Radhe AI v0.1.0 — Offline Terminal Assistant".cyan().bold());
+    println!("{}", "Type your question, or prefix with --code / --explain / --notes".yellow());
+    println!("{}", "/exit to quit, /clear to clear screen".yellow());
+    println!();
+
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+
+    loop {
+        print!("{}", ">>> ".green().bold());
+        io::stdout().flush().context("failed to flush stdout")?;
+
+        let mut input = String::new();
+        let bytes_read = reader.read_line(&mut input).context("failed to read from stdin")?;
+        
+        if bytes_read == 0 {
+            println!("\n{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+            break;
+        }
+
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed == "/exit" {
+            println!("{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+            break;
+        }
+
+        if trimmed == "/clear" {
+            for _ in 0..50 {
+                println!();
+            }
+            continue;
+        }
+
+        // Parse input prefixes
+        let (prompt_text, mode, max_tokens) = if trimmed.starts_with("--code ") {
+            let task = trimmed["--code ".len()..].trim();
+            let has_lang_hint = task
+                .to_lowercase()
+                .split(|c: char| !c.is_alphanumeric() && c != '+' && c != '#')
+                .any(|word| {
+                    matches!(
+                        word,
+                        "c" | "c++"
+                            | "cpp"
+                            | "c#"
+                            | "csharp"
+                            | "rust"
+                            | "python"
+                            | "java"
+                            | "javascript"
+                            | "js"
+                            | "typescript"
+                            | "ts"
+                            | "go"
+                            | "golang"
+                            | "ruby"
+                            | "php"
+                            | "swift"
+                            | "kotlin"
+                            | "bash"
+                            | "shell"
+                            | "powershell"
+                            | "sql"
+                            | "html"
+                            | "css"
+                            | "assembly"
+                    )
+                });
+
+            let mut task_str = task.to_string();
+            if has_lang_hint {
+                task_str.push_str(", respect the exact language specified.");
+            }
+
+            let prompt = format!(
+                "You are a coding assistant. Return ONLY valid compilable code with zero explanation. No markdown, no backticks, no comments. Just raw code.
+Task: {task_str}"
+            );
+            (prompt, "code", 300)
+        } else if trimmed.starts_with("--explain ") {
+            let topic = trimmed["--explain ".len()..].trim();
+            let prompt = format!(
+                "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:"
+            );
+            (prompt, "explain", 200)
+        } else if trimmed.starts_with("--notes ") {
+            let topic = trimmed["--notes ".len()..].trim();
+            let prompt = format!(
+                "Write exactly 6 short student notes about '{topic}'. Format: bullet points. Each bullet = one fact. Max 10 words per bullet. Stop after 6 bullets. No repetition.\n\nNotes:"
+            );
+            (prompt, "notes", 150)
+        } else {
+            let prompt = format!(
+                "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:"
+            );
+            (prompt, "explain", 200)
+        };
+
+        // Call run_inference
+        match run_inference(&prompt_text, model, max_tokens, mode) {
+            Ok(output) => {
+                println!("{output}");
+            }
+            Err(e) => {
+                eprintln!("Error: {:?}", e);
+            }
+        }
+        println!();
+    }
+
+    Ok(())
 }
