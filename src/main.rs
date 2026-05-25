@@ -150,7 +150,14 @@ Task: {task_str}"
 
     if let Some(topic) = &cli.notes {
         return Ok(format!(
-            "Write exactly 6 short student notes about '{topic}'. Format: bullet points. Each bullet = one fact. Max 10 words per bullet. Stop after 6 bullets. No repetition.\n\nNotes:"
+            "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
         ));
     }
 
@@ -539,7 +546,14 @@ Task: {task_str}"
         } else if trimmed.starts_with("--notes ") {
             let topic = trimmed["--notes ".len()..].trim();
             let prompt = format!(
-                "Write exactly 6 short student notes about '{topic}'. Format: bullet points. Each bullet = one fact. Max 10 words per bullet. Stop after 6 bullets. No repetition.\n\nNotes:"
+                "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
             );
             (prompt, "notes", 150)
         } else {
