@@ -6,19 +6,21 @@ This document highlights the current developmental health, active milestones, an
 
 ## Active Release Status
 
-* **Current Stable Version**: `v0.1.1` (Interactive quiz, model configuration & selection, doctor diagnostics, models, and update subcommands)
-* **Status**: :white_check_mark: Active development / v0.1.1 successfully launched.
+* **Current Stable Version**: `v0.3.0` (Interactive quiz, model configuration, models, update, and summarize subcommands)
+* **Status**: :white_check_mark: Active development / v0.3.0 successfully launched.
 
 ---
 
 ## Milestones Dashboard
 
-### :checkered_flag: Milestone 0.1.1: Advanced CLI Options & Quiz Engine (Completed)
+### :checkered_flag: Milestone 0.3.0: File Summarization & Self-Updates (Completed)
+* [x] **File Summarization (`--summarize`)**: Truncates inputs to 3000 characters and generates structured 5-bullet summary notes.
+* [x] **Self-Update Engine (`radhe update`)**: PowerShell-based live connection check, secure credential retrieval, and automatic Windows executable swapping.
+* [x] **Default Model Upgrade**: Lifted default offline LLM model from `0.5B` to the advanced `Qwen2.5-Coder 1.5B`.
 * [x] **Interactive CS Quiz Engine (`--quiz` / `--count`)**: Formulates custom computer science student exams and evaluates student input case-insensitively.
 * [x] **Configuration System (`config.toml`)**: Auto-generates configuration file `~/.radhe/config.toml` on startup and parses preferences.
 * [x] **CLI Flag Overrides**: Priority resolution: CLI `--model` / `--max-tokens` > `config.toml` > defaults.
 * [x] **Model Subcommand (`radhe models`)**: Auto-scans directory size, outputs MB, and highlights active `.gguf` file.
-* [x] **Self-Update Engine (`radhe update`)**: Automated connection check, binary replacement, and file renaming on Windows.
 
 ### :checkered_flag: Milestone 0.1.0: Core Offline Engine (Completed)
 * [x] **Lightweight Rust CLI Harness**: Built with `clap` and optimized release settings.
@@ -37,7 +39,7 @@ This document highlights the current developmental health, active milestones, an
 * [ ] **Pre-compiled Binary Bundles**: Release pre-built platform-dependent packages via GitHub Releases.
 * [ ] **Unified Setup Directory**: Establish directory creation during install inside the user's home folder `~/.radhe`.
 
-### :bulb: Milestone 0.3.0: Hindi Support & Editor Integrations (Planned)
+### :bulb: Milestone 0.4.0: Hindi Support & Editor Integrations (Planned)
 * [ ] **Multilingual Prompt Templates**: Add Hindi-English (Hinglish) support for explanation and student notes modes.
 * [ ] **VS Code Extension**: Lightweight extension to invoke the local model using keyboard shortcut bindings.
 * [ ] **Vim/Neovim Plugin**: Simple Lua script to pipe marked visual blocks straight through `radhe --fix`.

@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.1.1] — 2026-05-26
+## [0.3.0] — 2026-05-26
 
 ### Added
+- **File Summarization Mode (`--summarize`)**:
+  - Summarizes student notes into 5 structured, concise bullet facts starting with a dash.
+  - Automatically truncates notes exceeding 3000 characters to stay within model context bounds.
+  - Generates loading indicators (`Summarizing {filename}...`) and handles missing/empty file bounds cleanly.
+- **Default Model Upgrade**:
+  - Upgraded the default offline quantized LLM from `qwen2` (0.5B) to the advanced `Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf` (1.04GB).
+  - Maintained full backwards compatibility, enabling the 0.5B model via the `--model qwen-0.5b` override.
 - **Interactive Quiz Mode (`--quiz` / `--count`)**:
   - Generates custom computer science student exam multiple-choice questions.
   - Features real-time standard input parsing and matching (case-insensitive ticks and crosses).
