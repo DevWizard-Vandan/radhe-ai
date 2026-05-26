@@ -73,7 +73,7 @@ fn main() -> Result<()> {
     if !config_path.exists() {
         let default_config = r#"# Radhe AI Configuration
 # Change model to use a different GGUF file from ~/.radhe/models/
-model = "qwen2.gguf"
+model = "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
 max_tokens = 300
 "#;
         fs::write(&config_path, default_config)?;
@@ -100,10 +100,11 @@ max_tokens = 300
         cli.fix = Some(abs_path.to_string_lossy().into_owned());
     }
 
+    // Keep 0.5B accessible via --model qwen-0.5b override flag
     let active_model = cli.model
         .clone()
         .or_else(|| config.model.clone())
-        .unwrap_or_else(|| "qwen2.gguf".to_string());
+        .unwrap_or_else(|| "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf".to_string());
 
     let active_max_tokens = cli.max_tokens
         .or(config.max_tokens)
