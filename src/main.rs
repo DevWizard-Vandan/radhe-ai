@@ -39,6 +39,9 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     summarize: Option<String>,
 
+    #[arg(long)]
+    chat: bool,
+
     #[arg(long, value_name = "TOPIC")]
     quiz: Option<String>,
 
@@ -138,14 +141,14 @@ max_tokens = 300
         && cli.notes.is_none()
         && cli.fix.is_none()
         && cli.quiz.is_none()
-        && cli.summarize.is_none();
+        && cli.summarize.is_none()
+        && !cli.chat;
 
     if is_repl {
         run_repl(&active_model)?;
         return Ok(());
     }
 
-    let prompt = build_prompt(&cli)?;
     let mode = if cli.code.is_some() {
         "code"
     } else if cli.explain.is_some() {
@@ -158,9 +161,18 @@ max_tokens = 300
         "quiz"
     } else if cli.summarize.is_some() {
         "summarize"
+    } else if cli.chat {
+        "chat"
     } else {
         "prompt"
     };
+
+    if mode == "chat" {
+        run_chat(&active_model)?;
+        return Ok(());
+    }
+
+    let prompt = build_prompt(&cli)?;
     let max_tokens = match mode {
         "code" => 300,
         "explain" => 200,
@@ -975,6 +987,59 @@ fn run_update() -> Result<()> {
     println!("Radhe AI updated to v{latest_version}! Restart your terminal.");
     Ok(())
 }
+
+fn run_chat(active_model: &str) -> Result<()> {
+    println!("Radhe AI - Chat Mode");
+    println!("Type 'exit' to quit.");
+    println!("──────────────────────");
+
+    let mut history: Vec<(String, String)> = vec![]; // (user, assistant) pairs
+    use std::io::{self, Write};
+
+    loop {
+        print!("You: ");
+        let _ = io::stdout().flush();
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_err() {
+            println!("Error reading input.");
+            continue;
+        }
+        let input = input.trim().to_string();
+        if input == "exit" || input == "quit" {
+            println!("Goodbye!");
+            break;
+        }
+        if input.is_empty() {
+            continue;
+        }
+
+        // Build rolling prompt from history
+        let mut prompt = String::from(
+            "You are Radhe, a helpful AI assistant for students. Be concise and clear.\n\n"
+        );
+        for (u, a) in &history {
+            prompt.push_str(&format!("User: {}\nAssistant: {}\n\n", u, a));
+        }
+        prompt.push_str(&format!("User: {}\nAssistant:", input));
+
+        // Run inference (same as existing modes)
+        print!("Radhe: ");
+        let _ = io::stdout().flush();
+        
+        let response = run_inference(&prompt, active_model, 300, "chat")
+            .context("failed to run local inference")?;
+
+        // Store in history, cap at last 6 turns to avoid context overflow
+        history.push((input, response.clone()));
+        if history.len() > 6 {
+            history.remove(0);
+        }
+        println!("{}", response);
+        println!();
+    }
+    Ok(())
+}
+
 
 
 

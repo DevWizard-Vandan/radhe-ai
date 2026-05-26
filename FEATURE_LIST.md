@@ -180,3 +180,20 @@ Summarizes student notes or visual text logs into 5 clear, structured revision b
   {file_contents}
   ```
 * **Output Processing**: Prints the result directly to the terminal, and limits input context to the first 3000 characters.
+
+---
+
+## 13. Persistent Conversation Chat Mode (`--chat`)
+Enters an interactive chat wrapper that remembers rolling context up to the last 6 turns.
+
+* **CLI Argument**: `radhe --chat`
+* **Token Limit**: Exactly `300` tokens per response.
+* **Underlying Prompt Engineering**:
+  ```text
+  You are Radhe, a helpful AI assistant for students. Be concise and clear.
+  
+  [Rolling history of last 6 turns]
+  User: {input}
+  Assistant:
+  ```
+* **Control Commands**: Type `exit` or `quit` to exit session.
