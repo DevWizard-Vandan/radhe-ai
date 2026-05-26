@@ -53,10 +53,10 @@ try {
     Remove-Item -Path $LlamaZip -Force | Out-Null
     Remove-Item -Path $TempExtract -Recurse -Force | Out-Null
 
-    # 5. Download model qwen2.gguf
-    $ModelUrl = "https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
-    $ModelDest = Join-Path $ModelsDir "qwen2.gguf"
-    Write-Host "Downloading Qwen2.5-Coder model from $ModelUrl..." -ForegroundColor Yellow
+    # 5. Download model Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf
+    $ModelUrl = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+    $ModelDest = Join-Path $ModelsDir "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
+    Write-Host "Downloading Qwen2.5-Coder 1.5B model (~1GB)..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $ModelUrl -OutFile $ModelDest -ShowProgress
 
     # 6. Add $BinDir to User PATH permanently
@@ -73,7 +73,7 @@ try {
 
     # 7. Print Success Message
     Write-Host ""
-    Write-Host "Radhe AI installed successfully!" -ForegroundColor Green
+    Write-Host "Radhe AI v0.4.0 installed successfully!" -ForegroundColor Green
     Write-Host "Restart your terminal, then try:" -ForegroundColor Green
     Write-Host "radhe --code `"hello world in c`"" -ForegroundColor Green
     Write-Host "radhe --explain `"binary search`"" -ForegroundColor Green
