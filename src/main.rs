@@ -1015,7 +1015,7 @@ fn run_chat(active_model: &str) -> Result<()> {
 
         // Build rolling prompt from history
         let mut prompt = String::from(
-            "You are Radhe, a helpful AI assistant for students. Be concise and clear.\n\n"
+            "You are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.\n\n"
         );
         for (u, a) in &history {
             prompt.push_str(&format!("User: {}\nAssistant: {}\n\n", u, a));
@@ -1028,6 +1028,21 @@ fn run_chat(active_model: &str) -> Result<()> {
         
         let response = run_inference(&prompt, active_model, 300, "chat")
             .context("failed to run local inference")?;
+
+        // Strip at first repetition marker
+        let response = response
+            .split("### END OF RESPONSE")
+            .next()
+            .unwrap_or(&response)
+            .trim()
+            .to_string();
+        // Also strip if model echoes "User:" (means it started hallucinating next turn)
+        let response = response
+            .split("\nUser:")
+            .next()
+            .unwrap_or(&response)
+            .trim()
+            .to_string();
 
         // Store in history, cap at last 6 turns to avoid context overflow
         history.push((input, response.clone()));
