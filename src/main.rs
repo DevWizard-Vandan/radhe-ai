@@ -379,7 +379,7 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         .join(&model_filename);
     let model_path = model_path.to_string_lossy().into_owned();
 
-    let prompt_with_delim = if mode == "fix" {
+    let prompt_with_delim = if mode == "fix" || mode == "chat" {
         prompt.to_string()
     } else {
         format!("{}\n\n### RESPONSE:\n", prompt)
@@ -470,12 +470,24 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
             .replace("\\n", "\n")
             .replace("\\r", "\r")
             .replace("\\t", "\t");
-        let end_pos = cleaned_content.find(&prompt_normalized)
-            .map(|p| p + prompt_normalized.len())
-            .or_else(|| cleaned_content.find(&trimmed_prompt_normalized).map(|p| p + trimmed_prompt_normalized.len()))
+
+        let prompt_clean = prompt_normalized
+            .replace("<|im_start|>", "")
+            .replace("<|im_end|>", "");
+        let trimmed_prompt_clean = trimmed_prompt_normalized
+            .replace("<|im_start|>", "")
+            .replace("<|im_end|>", "");
+
+        let cleaned_content_clean = cleaned_content
+            .replace("<|im_start|>", "")
+            .replace("<|im_end|>", "");
+
+        let end_pos = cleaned_content_clean.find(&prompt_clean)
+            .map(|p| p + prompt_clean.len())
+            .or_else(|| cleaned_content_clean.find(&trimmed_prompt_clean).map(|p| p + trimmed_prompt_clean.len()))
             .unwrap_or(0);
 
-        let rest = &cleaned_content[end_pos..];
+        let rest = &cleaned_content_clean[end_pos..];
         let response = if let Some(first_newline_idx) = rest.find('\n') {
             let before_newline = &rest[..first_newline_idx];
             if before_newline.trim().is_empty() {
