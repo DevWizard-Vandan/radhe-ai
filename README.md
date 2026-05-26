@@ -37,17 +37,18 @@ Built for B.Tech/Diploma students with weak WiFi, low-end laptops, and no budget
 
 ---
 
-## Install (Windows)
-
-Open PowerShell and run:
-
+## Install
+### Windows (PowerShell)
 ```powershell
 irm https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/installer/install.ps1 | iex
 ```
-
-That's it. The installer will:
-- Download `radhe.exe` (~640 KB)
-- Download `llama-completion.exe` (inference engine)
+### Linux / macOS (bash)
+```bash
+curl -fsSL https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/installer/install.sh | bash
+```
+Both installers will:
+- Download the `radhe` binary (~800 KB)
+- Download `llama-completion` (inference engine)
 - Download `qwen2.gguf` AI model (~400 MB)
 - Add everything to PATH automatically
 
@@ -111,7 +112,7 @@ Radhe AI v0.2.0 — Offline Terminal Assistant
 
 | Requirement | Minimum |
 |---|---|
-| OS | Windows 10/11 x64 |
+| OS | Windows 10/11 x64 OR Ubuntu 20.04+ x64 |
 | RAM | 2 GB free |
 | Storage | 600 MB |
 | Internet | Only during install |
