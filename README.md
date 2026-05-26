@@ -3,6 +3,11 @@
 > A tiny offline terminal AI assistant for students.  
 > No internet. No login. No API keys. Just type and get answers.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Project Status: Active](https://img.shields.io/badge/Project%20Status-Active-green.svg)](PROJECT_STATUS.md)
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](PROJECT_GUIDE.md)
+
 ---
 
 ## Why Radhe AI?
@@ -94,7 +99,7 @@ int main() {
 
 ```text
 $ radhe
-Radhe AI v0.1.0 — Offline Terminal Assistant
+Radhe AI v0.2.0 — Offline Terminal Assistant
 >>> --code "stack in c"
 >>> --explain "pointers"
 >>> /exit
