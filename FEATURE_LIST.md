@@ -164,3 +164,19 @@ Automates checking and updating the client to the latest release.
 
 * **Subcommand**: `radhe update`
 * **Logic**: Queries GitHub releases API, compares versions, downloads new binary, and performs a zero-interruption update by renaming old files.
+
+---
+
+## 12. File Summarization (`--summarize`)
+Summarizes student notes or visual text logs into 5 clear, structured revision bullets.
+
+* **CLI Argument**: `radhe --summarize <filepath>`
+* **Token Limit**: Exactly `200` tokens.
+* **Underlying Prompt Engineering**:
+  ```text
+  You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).
+
+  Notes:
+  {file_contents}
+  ```
+* **Output Processing**: Prints the result directly to the terminal, and limits input context to the first 3000 characters.

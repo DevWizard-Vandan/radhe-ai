@@ -36,6 +36,9 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     fix: Option<String>,
 
+    #[arg(long, value_name = "FILE")]
+    summarize: Option<String>,
+
     #[arg(long, value_name = "TOPIC")]
     quiz: Option<String>,
 
@@ -121,7 +124,8 @@ max_tokens = 300
         && cli.explain.is_none()
         && cli.notes.is_none()
         && cli.fix.is_none()
-        && cli.quiz.is_none();
+        && cli.quiz.is_none()
+        && cli.summarize.is_none();
 
     if is_repl {
         run_repl(&active_model)?;
@@ -139,6 +143,8 @@ max_tokens = 300
         "fix"
     } else if cli.quiz.is_some() {
         "quiz"
+    } else if cli.summarize.is_some() {
+        "summarize"
     } else {
         "prompt"
     };
@@ -148,8 +154,21 @@ max_tokens = 300
         "notes" => 150,
         "fix" => 400,
         "quiz" => 500,
+        "summarize" => 200,
         _ => active_max_tokens,
     };
+
+    if mode == "summarize" {
+        if let Some(file_path_str) = &cli.summarize {
+            let path = PathBuf::from(file_path_str);
+            if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+                println!("Summarizing {}...", filename);
+            } else {
+                println!("Summarizing {}...", file_path_str);
+            }
+        }
+    }
+
     let output = run_inference(&prompt, &active_model, max_tokens, mode)
         .context("failed to run local inference")?;
 
@@ -264,6 +283,35 @@ BROKEN CODE:
 {}
 FIXED CODE:\n",
             language, cleaned_code
+        ));
+    }
+
+    if let Some(file_path_str) = &cli.summarize {
+        let path = PathBuf::from(file_path_str);
+        if !path.exists() {
+            eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+            std::process::exit(1);
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => {
+                eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+                std::process::exit(1);
+            }
+        };
+        let trimmed_content = content.trim();
+        if trimmed_content.is_empty() {
+            eprintln!("Error: File is empty.");
+            std::process::exit(1);
+        }
+        let truncated: String = trimmed_content.chars().take(3000).collect();
+
+        return Ok(format!(
+            "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).
+
+Notes:
+{}",
+            truncated
         ));
     }
 
