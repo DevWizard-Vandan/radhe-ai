@@ -844,15 +844,15 @@ fn run_update() -> Result<()> {
 
     println!("Checking for updates...");
 
-    let curl_res = Command::new("curl")
-        .args(["-s", "https://api.github.com/repos/DevWizard-Vandan/radhe-ai/releases/latest"])
+    let ps_output = Command::new("powershell")
+        .args([
+            "-Command",
+            "Invoke-RestMethod -Uri 'https://api.github.com/repos/DevWizard-Vandan/radhe-ai/releases/latest' | Select-Object -ExpandProperty tag_name"
+        ])
         .output();
 
-    let output = match curl_res {
+    let output = match ps_output {
         Ok(out) => out,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            anyhow::bail!("curl is required for updates. Please update manually from github.com/DevWizard-Vandan/radhe-ai");
-        }
         Err(_) => {
             anyhow::bail!("Update check failed. Are you connected to the internet?");
         }
@@ -863,17 +863,14 @@ fn run_update() -> Result<()> {
     }
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
-    let latest_version = if let Some(pos) = stdout_str.find("\"tag_name\":\"v") {
-        let start = pos + "\"tag_name\":\"v".len();
-        let rest = &stdout_str[start..];
-        if let Some(end_quote) = rest.find('"') {
-            rest[..end_quote].to_string()
-        } else {
-            anyhow::bail!("Update check failed. Are you connected to the internet?");
-        }
-    } else {
+    let mut latest_version = stdout_str.trim().to_string();
+    if latest_version.starts_with('v') {
+        latest_version = latest_version[1..].to_string();
+    }
+
+    if latest_version.is_empty() {
         anyhow::bail!("Update check failed. Are you connected to the internet?");
-    };
+    }
 
     if current_version == latest_version {
         println!("Radhe AI is already up to date (v{current_version})");
@@ -888,17 +885,16 @@ fn run_update() -> Result<()> {
     let new_exe_path = exe_dir.join("radhe_new.exe");
     let new_exe_path_str = new_exe_path.to_string_lossy().to_string();
 
-    let download_status = Command::new("curl")
+    let download_url = "https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/radhe.exe";
+    let download_status = Command::new("powershell")
         .args([
-            "-L",
-            "-o",
-            &new_exe_path_str,
-            "https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/radhe.exe",
+            "-Command",
+            &format!("Invoke-WebRequest -Uri '{}' -OutFile '{}'", download_url, new_exe_path_str)
         ])
-        .status();
+        .output();
 
     let download_success = match download_status {
-        Ok(status) => status.success(),
+        Ok(out) => out.status.success(),
         Err(_) => false,
     };
 
