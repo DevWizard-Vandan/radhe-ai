@@ -111,3 +111,56 @@ Launches a beautiful, state-of-the-art terminal wrapper when the CLI is run with
   - `--explain <text>`: Triggers explanation prompt.
   - `--notes <text>`: Triggers notes prompt.
   - Any raw input: Evaluates as a general prompt in `--explain` mode.
+
+---
+
+## 8. Interactive Quiz Engine (`--quiz` / `--count`)
+Formulates custom multiple-choice question sets and tests student knowledge interactively.
+
+* **CLI Argument**: `radhe --quiz "<topic>" [--count <number>]`
+* **Token Limit**: Exactly `500` tokens.
+* **Underlying Prompt Engineering**:
+  ```text
+  Write {count} exam MCQs about '{topic}'. Use this exact format for each:
+  Q1: [question text]
+  a) [option]
+  b) [option]
+  c) [option]
+  d) [option]
+  Answer: [single letter a/b/c/d]
+  Q2: [question text]
+  ...
+  Only output the questions. No intro, no explanation.
+  ```
+* **Interactive Evaluation**: Hides the correct answer, prompts standard input, compares case-insensitively, and increments scores only for valid expected answer choices (`a`, `b`, `c`, or `d`).
+
+---
+
+## 9. Configuration & Selection Priorities (`config.toml` / `--model`)
+Allows easy personalization of model preferences and bounds.
+
+* **Default Config File**: `~/.radhe/config.toml` (auto-generated if missing):
+  ```toml
+  # Radhe AI Configuration
+  # Change model to use a different GGUF file from ~/.radhe/models/
+  model = "qwen2.gguf"
+  max_tokens = 300
+  ```
+* **CLI Flag**: `radhe --model <FILENAME> [--max-tokens <NUMBER>]`
+* **Precedence Level**: `CLI Flag` > `config.toml` > `defaults`.
+
+---
+
+## 10. List Models (`models`)
+Scans and prints downloaded GGUF files.
+
+* **Subcommand**: `radhe models`
+* **Details Displayed**: Filename, size in MB, and highlights active with `*` and `[active]`.
+
+---
+
+## 11. Self-Update Engine (`update`)
+Automates checking and updating the client to the latest release.
+
+* **Subcommand**: `radhe update`
+* **Logic**: Queries GitHub releases API, compares versions, downloads new binary, and performs a zero-interruption update by renaming old files.

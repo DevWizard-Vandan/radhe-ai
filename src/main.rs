@@ -54,6 +54,7 @@ enum Commands {
     Init,
     Doctor,
     Models,
+    Update,
 }
 
 fn main() -> Result<()> {
@@ -106,6 +107,10 @@ max_tokens = 300
         }
         Some(Commands::Models) => {
             run_models(&active_model)?;
+            return Ok(());
+        }
+        Some(Commands::Update) => {
+            run_update()?;
             return Ok(());
         }
         None => {}
@@ -833,5 +838,86 @@ fn run_models(active_model: &str) -> Result<()> {
 
     Ok(())
 }
+
+fn run_update() -> Result<()> {
+    let current_version = env!("CARGO_PKG_VERSION");
+
+    println!("Checking for updates...");
+
+    let curl_res = Command::new("curl")
+        .args(["-s", "https://api.github.com/repos/DevWizard-Vandan/radhe-ai/releases/latest"])
+        .output();
+
+    let output = match curl_res {
+        Ok(out) => out,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            anyhow::bail!("curl is required for updates. Please update manually from github.com/DevWizard-Vandan/radhe-ai");
+        }
+        Err(_) => {
+            anyhow::bail!("Update check failed. Are you connected to the internet?");
+        }
+    };
+
+    if !output.status.success() {
+        anyhow::bail!("Update check failed. Are you connected to the internet?");
+    }
+
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let latest_version = if let Some(pos) = stdout_str.find("\"tag_name\":\"v") {
+        let start = pos + "\"tag_name\":\"v".len();
+        let rest = &stdout_str[start..];
+        if let Some(end_quote) = rest.find('"') {
+            rest[..end_quote].to_string()
+        } else {
+            anyhow::bail!("Update check failed. Are you connected to the internet?");
+        }
+    } else {
+        anyhow::bail!("Update check failed. Are you connected to the internet?");
+    };
+
+    if current_version == latest_version {
+        println!("Radhe AI is already up to date (v{current_version})");
+        return Ok(());
+    }
+
+    println!("Update available: v{current_version} → v{latest_version}");
+    println!("Downloading new binary...");
+
+    let current_exe = std::env::current_exe()?;
+    let exe_dir = current_exe.parent().context("failed to get current exe directory")?;
+    let new_exe_path = exe_dir.join("radhe_new.exe");
+    let new_exe_path_str = new_exe_path.to_string_lossy().to_string();
+
+    let download_status = Command::new("curl")
+        .args([
+            "-L",
+            "-o",
+            &new_exe_path_str,
+            "https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/radhe.exe",
+        ])
+        .status();
+
+    let download_success = match download_status {
+        Ok(status) => status.success(),
+        Err(_) => false,
+    };
+
+    if !download_success {
+        anyhow::bail!("Download failed. Please try again or update manually.");
+    }
+
+    // Replace the current binary
+    let old_exe_path = exe_dir.join("radhe_old.exe");
+    if old_exe_path.exists() {
+        let _ = fs::remove_file(&old_exe_path);
+    }
+
+    fs::rename(&current_exe, &old_exe_path).context("failed to rename current binary to radhe_old.exe")?;
+    fs::rename(&new_exe_path, &current_exe).context("failed to rename radhe_new.exe to radhe.exe")?;
+
+    println!("Radhe AI updated to v{latest_version}! Restart your terminal.");
+    Ok(())
+}
+
 
 

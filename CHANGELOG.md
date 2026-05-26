@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] — 2026-05-26
+
+### Added
+- **Interactive Quiz Mode (`--quiz` / `--count`)**:
+  - Generates custom computer science student exam multiple-choice questions.
+  - Features real-time standard input parsing and matching (case-insensitive ticks and crosses).
+  - Skips scoring gracefully if answer keys or valid labels are missing.
+- **Model Selection & Configuration System**:
+  - Adds `~/.radhe/config.toml` auto-generation and dynamic parsing.
+  - Implements three-tier priority resolution: CLI `--model` > `config.toml` > hardcoded default.
+  - Allows `--max-tokens` CLI overrides and file configuration.
+- **Dynamic Model Subcommand (`radhe models`)**:
+  - Lists downloaded `.gguf` model files under `~/.radhe/models/`.
+  - Shows exact sizes in MB and highlights the active model with `*` and `[active]` labels.
+- **Upgraded Environment Diagnostics**:
+  - `doctor` subcommand dynamically validates and locates the configured active GGUF model path.
+- **Self-Update Engine (`radhe update`)**:
+  - Checks for the latest release via the GitHub API by querying latest release details.
+  - Handles update validation, binary download, and renaming of standard binaries for zero-interruption updates on Windows.
+
 ## [0.1.0] — 2026-05-25
 
 ### Added

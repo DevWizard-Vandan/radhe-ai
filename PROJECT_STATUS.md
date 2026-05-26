@@ -6,12 +6,19 @@ This document highlights the current developmental health, active milestones, an
 
 ## Active Release Status
 
-* **Current Stable Version**: `v0.1.0` (Offline CLI with Code/Explain/Notes/Fix modes, Doctor checks, and Interactive REPL)
-* **Status**: :white_check_mark: Active development / MVP successfully launched.
+* **Current Stable Version**: `v0.1.1` (Interactive quiz, model configuration & selection, doctor diagnostics, models, and update subcommands)
+* **Status**: :white_check_mark: Active development / v0.1.1 successfully launched.
 
 ---
 
 ## Milestones Dashboard
+
+### :checkered_flag: Milestone 0.1.1: Advanced CLI Options & Quiz Engine (Completed)
+* [x] **Interactive CS Quiz Engine (`--quiz` / `--count`)**: Formulates custom computer science student exams and evaluates student input case-insensitively.
+* [x] **Configuration System (`config.toml`)**: Auto-generates configuration file `~/.radhe/config.toml` on startup and parses preferences.
+* [x] **CLI Flag Overrides**: Priority resolution: CLI `--model` / `--max-tokens` > `config.toml` > defaults.
+* [x] **Model Subcommand (`radhe models`)**: Auto-scans directory size, outputs MB, and highlights active `.gguf` file.
+* [x] **Self-Update Engine (`radhe update`)**: Automated connection check, binary replacement, and file renaming on Windows.
 
 ### :checkered_flag: Milestone 0.1.0: Core Offline Engine (Completed)
 * [x] **Lightweight Rust CLI Harness**: Built with `clap` and optimized release settings.
