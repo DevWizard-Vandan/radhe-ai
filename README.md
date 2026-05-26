@@ -1,168 +1,48 @@
-# Radhe AI ⚡
-
-> A tiny offline terminal AI assistant for students.  
-> No internet. No login. No API keys. Just type and get answers.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Project Status: Active](https://img.shields.io/badge/Project%20Status-Active-green.svg)](PROJECT_STATUS.md)
-[![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](PROJECT_GUIDE.md)
-
----
-
-## Why Radhe AI?
-
-Most AI tools require:
-- ☁️ Internet connection
-- 🔑 API keys or accounts
-- 💻 Heavy installations
-- 💳 Subscriptions
-
-**Radhe AI requires none of that.**
-
-Built for B.Tech/Diploma students with weak WiFi, low-end laptops, and no budget.
-
----
+# Radhe AI 🎓
+> Your offline AI study assistant — runs entirely on your laptop, no internet required.
 
 ## Features
-
-| Command | Description |
+| Command | What it does |
 |---|---|
-| `radhe --code "bubble sort in c"` | Generate compilable code instantly |
-| `radhe --explain "recursion"` | Get beginner-friendly explanations |
-| `radhe --notes "OS scheduling"` | Generate bullet-point study notes |
-| `radhe --fix main.c` | Debug and fix broken code files |
-| `radhe` | Launch interactive REPL session |
+| `radhe --code "..."` | Generate code from a prompt |
+| `radhe --explain "..."` | Explain a concept clearly |
+| `radhe --notes "..."` | Generate study notes |
+| `radhe --fix "..."` | Fix broken code |
+| `radhe --quiz "..."` | Get quiz questions on a topic |
+| `radhe --summarize <file>` | Summarize a text file into 5 bullets |
+| `radhe --chat` | Start a persistent conversation |
+| `radhe update` | Self-update to the latest version |
+| `radhe models` | List installed models |
 | `radhe doctor` | Check installation health |
 
----
-
-## Install
-### Windows (PowerShell)
+## Installation
+### Windows
+Open PowerShell and run:
 ```powershell
-irm https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/installer/install.ps1 | iex
+irm https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/install.ps1 | iex
 ```
-### Linux / macOS (bash)
-```bash
-curl -fsSL https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/installer/install.sh | bash
-```
-Both installers will:
-- Download the `radhe` binary (~800 KB)
-- Download `llama-completion` (inference engine)
-- Download `qwen2.gguf` AI model (~400 MB)
-- Add everything to PATH automatically
-
-Restart your terminal, then run:
-
-```powershell
-radhe --code "hello world in c"
-```
-
----
+This installs `radhe.exe` and downloads the default model (~1GB). Restart your terminal after install.
 
 ## Usage Examples
-
-### Generate Code
-
-```bash
-$ radhe --code "linked list in c"
-
-#include <stdio.h>
-#include <stdlib.h>
-
-struct Node {
-    int data;
-    struct Node* next;
-};
+```powershell
+# Explain a concept
+radhe --explain "what is a binary search tree"
+# Summarize your lecture notes
+radhe --summarize notes.txt
+# Chat session
+radhe --chat
+# Update to latest version
+radhe update
 ```
 
-### Explain a Concept  
+## Requirements
+- Windows 10/11
+- ~1.5GB free disk space (for model)
+- ~1GB RAM
+- Internet connection only for install and updates
 
-```bash
-$ radhe --explain "binary search tree"
-
-A BST stores values where left < root < right
-Search runs in O(log n) on average
-```
-
-### Fix Broken Code
-
-```bash
-$ radhe --fix main.c
-
-#include <stdio.h>
-int main() {
-    int x = 10; // semicolon fixed
-}
-```
-
-### Interactive REPL
-
-```text
-$ radhe
-Radhe AI v0.2.0 — Offline Terminal Assistant
->>> --code "stack in c"
->>> --explain "pointers"
->>> /exit
-```
-
----
-
-## System Requirements
-
-| Requirement | Minimum |
-|---|---|
-| OS | Windows 10/11 x64 OR Ubuntu 20.04+ x64 |
-| RAM | 2 GB free |
-| Storage | 600 MB |
-| Internet | Only during install |
-
----
-
-## How It Works
-
-```text
-radhe CLI (Rust)
-      ↓
-Prompt Engineering
-      ↓
-llama-completion.exe (llama.cpp)
-      ↓
-qwen2.gguf (Qwen2.5-Coder 0.5B, runs on CPU)
-      ↓
-Response printed to terminal
-```
-
-No cloud. No servers. Everything runs on your laptop.
-
----
-
-## Roadmap
-
-- [x] `--code` mode
-- [x] `--explain` mode  
-- [x] `--notes` mode
-- [x] `--fix` mode
-- [x] Interactive REPL
-- [x] Windows installer
-- [ ] Linux support
-- [ ] Colored terminal output
-- [ ] VS Code extension
-- [ ] Hindi + English mode
-- [ ] Offline DSA tutor
-
----
-
-## Contributing
-
-Pull requests welcome! Please open an issue first to discuss what you'd like to change.
-
----
+## Models
+Powered by **Qwen2.5-Coder 1.5B Instruct** (Q4 quantized, runs on CPU)
 
 ## License
-
-MIT — free to use, modify, and distribute.
-
----
-
-*Built with ❤️ for Indian students who just want to code.*
+MIT
