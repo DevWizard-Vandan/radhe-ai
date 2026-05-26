@@ -9,6 +9,7 @@
 | `radhe --notes "..."` | Generate study notes |
 | `radhe --fix "..."` | Fix broken code |
 | `radhe --quiz "..."` | Get quiz questions on a topic |
+| `radhe --quiz-file <file>` | Generate quiz questions from a notes file |
 | `radhe --summarize <file>` | Summarize a text file into 5 bullets |
 | `radhe --chat` | Start a persistent conversation |
 | `radhe update` | Self-update to the latest version |
