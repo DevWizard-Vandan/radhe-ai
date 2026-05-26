@@ -86,7 +86,19 @@ max_tokens = 300
         RadheConfig::default()
     };
 
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+
+    if let Some(ref path) = cli.summarize {
+        let abs_path = std::fs::canonicalize(path)
+            .unwrap_or_else(|_| std::path::PathBuf::from(path));
+        cli.summarize = Some(abs_path.to_string_lossy().into_owned());
+    }
+
+    if let Some(ref path) = cli.fix {
+        let abs_path = std::fs::canonicalize(path)
+            .unwrap_or_else(|_| std::path::PathBuf::from(path));
+        cli.fix = Some(abs_path.to_string_lossy().into_owned());
+    }
 
     let active_model = cli.model
         .clone()
