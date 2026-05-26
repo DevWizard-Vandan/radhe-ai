@@ -45,6 +45,9 @@ struct Cli {
     #[arg(long, value_name = "TOPIC")]
     quiz: Option<String>,
 
+    #[arg(long, value_name = "FILE")]
+    quiz_file: Option<String>,
+
     #[arg(long, value_name = "COUNT")]
     count: Option<u8>,
 
@@ -103,6 +106,12 @@ max_tokens = 300
         cli.fix = Some(abs_path.to_string_lossy().into_owned());
     }
 
+    if let Some(ref path) = cli.quiz_file {
+        let abs_path = std::fs::canonicalize(path)
+            .unwrap_or_else(|_| std::path::PathBuf::from(path));
+        cli.quiz_file = Some(abs_path.to_string_lossy().into_owned());
+    }
+
     // Keep 0.5B accessible via --model qwen-0.5b override flag
     let active_model = cli.model
         .clone()
@@ -142,6 +151,7 @@ max_tokens = 300
         && cli.fix.is_none()
         && cli.quiz.is_none()
         && cli.summarize.is_none()
+        && cli.quiz_file.is_none()
         && !cli.chat;
 
     if is_repl {
@@ -161,6 +171,8 @@ max_tokens = 300
         "quiz"
     } else if cli.summarize.is_some() {
         "summarize"
+    } else if cli.quiz_file.is_some() {
+        "quiz_file"
     } else if cli.chat {
         "chat"
     } else {
@@ -180,6 +192,7 @@ max_tokens = 300
         "fix" => 400,
         "quiz" => 500,
         "summarize" => 200,
+        "quiz_file" => 400,
         _ => active_max_tokens,
     };
 
@@ -190,6 +203,17 @@ max_tokens = 300
                 println!("Summarizing {}...", filename);
             } else {
                 println!("Summarizing {}...", file_path_str);
+            }
+        }
+    }
+
+    if mode == "quiz_file" {
+        if let Some(file_path_str) = &cli.quiz_file {
+            let path = PathBuf::from(file_path_str);
+            if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+                println!("Generating quiz from {}...", filename);
+            } else {
+                println!("Generating quiz from {}...", file_path_str);
             }
         }
     }
@@ -333,6 +357,40 @@ FIXED CODE:\n",
 
         return Ok(format!(
             "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).
+
+Notes:
+{}",
+            truncated
+        ));
+    }
+
+    if let Some(file_path_str) = &cli.quiz_file {
+        let path = PathBuf::from(file_path_str);
+        if !path.exists() {
+            eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+            std::process::exit(1);
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => {
+                eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+                std::process::exit(1);
+            }
+        };
+        let trimmed_content = content.trim();
+        if trimmed_content.is_empty() {
+            eprintln!("Error: File is empty.");
+            std::process::exit(1);
+        }
+        let truncated: String = trimmed_content.chars().take(3000).collect();
+
+        return Ok(format!(
+            "You are a student quiz generator. Based on the following notes, generate exactly 5 quiz questions with answers. Format each as:
+Q1: [question]
+A1: [answer]
+Q2: [question]
+A2: [answer]
+... and so on until Q5/A5.
 
 Notes:
 {}",
