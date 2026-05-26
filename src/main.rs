@@ -1,11 +1,18 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use serde::Deserialize;
 use std::{
     fs,
     io::ErrorKind,
     path::PathBuf,
     process::{Command, Stdio},
 };
+
+#[derive(Deserialize, Default, Debug)]
+struct RadheConfig {
+    model: Option<String>,
+    max_tokens: Option<u32>,
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "radhe")]
@@ -29,21 +36,62 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     fix: Option<String>,
 
-    #[arg(long, default_value = "qwen2")]
-    model: String,
+    #[arg(long, value_name = "TOPIC")]
+    quiz: Option<String>,
 
-    #[arg(long, default_value_t = 256)]
-    max_tokens: u32,
+    #[arg(long, value_name = "COUNT")]
+    count: Option<u8>,
+
+    #[arg(long, value_name = "FILENAME")]
+    model: Option<String>,
+
+    #[arg(long, value_name = "MAX_TOKENS")]
+    max_tokens: Option<u32>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
     Init,
     Doctor,
+    Models,
 }
 
 fn main() -> Result<()> {
+    let config_dir = dirs::home_dir()
+        .context("unable to find user home directory")?
+        .join(".radhe");
+    
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)?;
+    }
+
+    let config_path = config_dir.join("config.toml");
+    if !config_path.exists() {
+        let default_config = r#"# Radhe AI Configuration
+# Change model to use a different GGUF file from ~/.radhe/models/
+model = "qwen2.gguf"
+max_tokens = 300
+"#;
+        fs::write(&config_path, default_config)?;
+    }
+
+    let config: RadheConfig = if config_path.exists() {
+        let content = fs::read_to_string(&config_path).unwrap_or_default();
+        toml::from_str(&content).unwrap_or_default()
+    } else {
+        RadheConfig::default()
+    };
+
     let cli = Cli::parse();
+
+    let active_model = cli.model
+        .clone()
+        .or_else(|| config.model.clone())
+        .unwrap_or_else(|| "qwen2.gguf".to_string());
+
+    let active_max_tokens = cli.max_tokens
+        .or(config.max_tokens)
+        .unwrap_or(300);
 
     match cli.command {
         Some(Commands::Init) => {
@@ -53,7 +101,11 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Some(Commands::Doctor) => {
-            run_doctor();
+            run_doctor(&active_model);
+            return Ok(());
+        }
+        Some(Commands::Models) => {
+            run_models(&active_model)?;
             return Ok(());
         }
         None => {}
@@ -63,10 +115,11 @@ fn main() -> Result<()> {
         && cli.code.is_none()
         && cli.explain.is_none()
         && cli.notes.is_none()
-        && cli.fix.is_none();
+        && cli.fix.is_none()
+        && cli.quiz.is_none();
 
     if is_repl {
-        run_repl(&cli.model)?;
+        run_repl(&active_model)?;
         return Ok(());
     }
 
@@ -79,6 +132,8 @@ fn main() -> Result<()> {
         "notes"
     } else if cli.fix.is_some() {
         "fix"
+    } else if cli.quiz.is_some() {
+        "quiz"
     } else {
         "prompt"
     };
@@ -87,12 +142,17 @@ fn main() -> Result<()> {
         "explain" => 200,
         "notes" => 150,
         "fix" => 400,
-        _ => cli.max_tokens,
+        "quiz" => 500,
+        _ => active_max_tokens,
     };
-    let output = run_inference(&prompt, &cli.model, max_tokens, mode)
+    let output = run_inference(&prompt, &active_model, max_tokens, mode)
         .context("failed to run local inference")?;
 
-    println!("{output}");
+    if mode == "quiz" {
+        run_quiz(&output);
+    } else {
+        println!("{output}");
+    }
     Ok(())
 }
 
@@ -202,6 +262,22 @@ FIXED CODE:\n",
         ));
     }
 
+    if let Some(topic) = &cli.quiz {
+        let count = cli.count.unwrap_or(3);
+        return Ok(format!(
+            "Write {count} exam MCQs about '{topic}'. Use this exact format for each:
+Q1: [question text]
+a) [option]
+b) [option]
+c) [option]
+d) [option]
+Answer: [single letter a/b/c/d]
+Q2: [question text]
+...
+Only output the questions. No intro, no explanation."
+        ));
+    }
+
     if let Some(prompt) = &cli.prompt {
         return Ok(format!(
             "You are Radhe AI, a tiny offline terminal assistant for students. Be concise and practical.
@@ -213,11 +289,16 @@ User: {prompt}"
 }
 
 fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Result<String> {
+    let model_filename = if model.ends_with(".gguf") {
+        model.to_string()
+    } else {
+        format!("{model}.gguf")
+    };
     let model_path = dirs::home_dir()
         .context("unable to find user home directory")?
         .join(".radhe")
         .join("models")
-        .join(format!("{model}.gguf"));
+        .join(&model_filename);
     let model_path = model_path.to_string_lossy().into_owned();
 
     let prompt_with_delim = if mode == "fix" {
@@ -335,6 +416,10 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         let line_clean = line.replace("[end of text]", "");
         let line_trimmed = line_clean.trim();
 
+        if line_trimmed.contains("### RESPONSE:") {
+            continue;
+        }
+
         if line_trimmed == "```c"
             || line_trimmed == "```cpp"
             || line_trimmed == "```python"
@@ -419,26 +504,33 @@ fn init_dirs() -> Result<()> {
     Ok(())
 }
 
-fn run_doctor() {
+fn run_doctor(active_model: &str) {
+    println!("- Active model: {active_model}");
     println!("- Checking llama-completion.exe in PATH...");
     match Command::new("llama-completion.exe").arg("--help").output() {
         Ok(_) => println!("  OK: llama-completion.exe found"),
         Err(_) => println!("  MISSING: llama-completion.exe not found"),
     }
 
+    let model_filename = if active_model.ends_with(".gguf") {
+        active_model.to_string()
+    } else {
+        format!("{active_model}.gguf")
+    };
+
     let model_path = dirs::home_dir()
-        .map(|p| p.join(".radhe").join("models").join("qwen2.gguf"));
+        .map(|p| p.join(".radhe").join("models").join(&model_filename));
 
     if let Some(path) = &model_path {
         println!("- Expected model path: {}", path.display());
         if path.exists() {
             println!("  OK: model found");
         } else {
-            println!("  MISSING: download model to ~/.radhe/models/qwen2.gguf");
+            println!("  MISSING: download model to ~/.radhe/models/{model_filename}");
         }
     } else {
         println!("- Expected model path: unable to resolve home directory");
-        println!("  MISSING: download model to ~/.radhe/models/qwen2.gguf");
+        println!("  MISSING: download model to ~/.radhe/models/{model_filename}");
     }
 }
 
@@ -577,3 +669,169 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
 
     Ok(())
 }
+
+fn starts_with_q_marker(line: &str) -> bool {
+    let s = line.trim_start();
+    if !s.starts_with('Q') {
+        return false;
+    }
+    let rest = &s[1..];
+    let mut chars = rest.chars();
+    let mut has_digits = false;
+    while let Some(c) = chars.next() {
+        if c.is_ascii_digit() {
+            has_digits = true;
+        } else if c == ':' && has_digits {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    false
+}
+
+fn run_quiz(output: &str) {
+    let mut question_blocks: Vec<Vec<String>> = Vec::new();
+    let mut current_block: Vec<String> = Vec::new();
+
+    for line in output.lines() {
+        if starts_with_q_marker(line) {
+            if !current_block.is_empty() {
+                question_blocks.push(current_block);
+                current_block = Vec::new();
+            }
+        }
+        if starts_with_q_marker(line) || !current_block.is_empty() {
+            current_block.push(line.to_string());
+        }
+    }
+    if !current_block.is_empty() {
+        question_blocks.push(current_block);
+    }
+
+    let mut correct = 0;
+    let mut valid_questions = 0;
+
+    use std::io::{self, Write};
+
+    for q_block in question_blocks {
+        let mut expected_char: Option<char> = None;
+        let mut answer_line_idx: Option<usize> = None;
+
+        for (idx, line) in q_block.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.to_lowercase().starts_with("answer:") {
+                let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
+                if parts.len() == 2 {
+                    let ans_str = parts[1].trim().to_lowercase();
+                    if let Some(c) = ans_str.chars().next() {
+                        expected_char = Some(c);
+                    }
+                }
+                answer_line_idx = Some(idx);
+                break;
+            }
+        }
+
+        // Print question + options only (REMOVE the Answer: line)
+        for (idx, line) in q_block.iter().enumerate() {
+            if Some(idx) != answer_line_idx {
+                println!("{line}");
+            }
+        }
+
+        // Read user input, trim + lowercase + take first char
+        print!("Your answer: ");
+        let _ = io::stdout().flush();
+        let mut user_input = String::new();
+        if io::stdin().read_line(&mut user_input).is_err() {
+            println!("Error reading input.");
+            continue;
+        }
+        let user_char = user_input.trim().to_lowercase().chars().next();
+
+        let is_correct = match (expected_char, user_char) {
+            (Some(e), Some(u)) => e == u,
+            _ => false,
+        };
+
+        if let Some(ans_char) = expected_char {
+            if is_correct {
+                println!("✓ Correct!");
+            } else {
+                println!("✗ Wrong. Answer was: {ans_char}");
+            }
+        } else {
+            println!("✗ Wrong. (No valid answer key found)");
+        }
+
+        // Increment score only if answer letter is a/b/c/d (valid)
+        let is_valid = match expected_char {
+            Some('a') | Some('b') | Some('c') | Some('d') => true,
+            _ => false,
+        };
+
+        if is_valid {
+            valid_questions += 1;
+            if is_correct {
+                correct += 1;
+            }
+        }
+        println!();
+    }
+
+    println!("Score: {correct}/{valid_questions}");
+}
+
+fn run_models(active_model: &str) -> Result<()> {
+    let models_dir = dirs::home_dir()
+        .context("unable to find user home directory")?
+        .join(".radhe")
+        .join("models");
+
+    println!("Models in {}:", models_dir.display());
+    println!();
+
+    if !models_dir.exists() {
+        println!("No models directory found.");
+        return Ok(());
+    }
+
+    let active_model_filename = if active_model.ends_with(".gguf") {
+        active_model.to_string()
+    } else {
+        format!("{active_model}.gguf")
+    };
+
+    let mut found = false;
+    for entry in fs::read_dir(&models_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ext == "gguf" {
+                    if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+                        found = true;
+                        let metadata = entry.metadata()?;
+                        let size_bytes = metadata.len();
+                        let size_mb = size_bytes as f64 / 1024.0 / 1024.0;
+                        let is_active = filename.to_lowercase() == active_model_filename.to_lowercase();
+                        if is_active {
+                            println!("* {} ({:.0} MB) [active]", filename, size_mb);
+                        } else {
+                            println!("  {} ({:.0} MB)", filename, size_mb);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !found {
+        println!("No .gguf models found.");
+    }
+
+    Ok(())
+}
+
+
