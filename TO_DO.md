@@ -24,15 +24,15 @@
 ## 🟡 Short-Term (Next 1–2 Weeks)
 
 ### Cross-Platform Install
-- [ ] Write `install.sh` for Linux — mirrors `install.ps1`: create `~/.radhe/{bin,models}`, download `radhe` Linux binary, download llama.cpp Linux CPU build, download Qwen 1.5B model, add to PATH
-- [ ] Add "Linux Install" section to README with curl|bash one-liner
+- [x] Write `install.sh` for Linux — mirrors `install.ps1`: create `~/.radhe/{bin,models}`, download `radhe` Linux binary, download llama.cpp Linux CPU build, download Qwen 1.5B model, add to PATH
+- [x] Add "Linux Install" section to README with curl|bash one-liner
 - [ ] Decide macOS strategy — full `install.sh` or document manual steps only
 - [ ] Update README with "Manual install (advanced)" section linking to GitHub release assets
 
 ### Quality & Reliability
 - [ ] Add `radhe update` test using mocked GitHub response — factor version comparison into pure function
 - [ ] Add regression test for ChatML prompt + stop-string logic
-- [ ] Audit error messages for `--summarize`, `--quiz-file`, `--fix`, `update` — make them consistent and friendly
+- [x] Audit error messages for `--summarize`, `--quiz-file`, `--fix`, `update` — make them consistent and friendly
 - [x] Add `RADHE_DEBUG=1` env flag to print prompts, paths, and llama.cpp commands without affecting normal users
 
 ### Docs Hygiene
