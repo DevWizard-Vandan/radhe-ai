@@ -6,6 +6,17 @@
   "publisher": "DevWizard-Vandan",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Education", "Other"],
+  "keywords": ["ai", "student", "offline", "assistant", "education"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevWizard-Vandan/radhe-ai"
+  },
+  "scripts": {
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.24.0"
+  },
   "activationEvents": ["onCommand:radhe.explain", "onCommand:radhe.fix", "onCommand:radhe.quiz"],
   "main": "./extension.js",
   "contributes": {
@@ -14,6 +25,18 @@
       { "command": "radhe.fix", "title": "Radhe: Fix Selection" },
       { "command": "radhe.quiz", "title": "Radhe: Generate Quiz from File" }
     ],
+    "keybindings": [
+      { "command": "radhe.explain", "key": "ctrl+shift+e", "when": "editorTextFocus" },
+      { "command": "radhe.fix", "key": "ctrl+shift+f", "when": "editorTextFocus" },
+      { "command": "radhe.quiz", "key": "ctrl+shift+q", "when": "editorTextFocus" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "radhe.explain", "when": "editorHasSelection", "group": "radhe@1" },
+        { "command": "radhe.fix", "when": "editorHasSelection", "group": "radhe@2" },
+        { "command": "radhe.quiz", "group": "radhe@3" }
+      ]
+    },
     "configuration": {
       "title": "Radhe AI",
       "properties": {
