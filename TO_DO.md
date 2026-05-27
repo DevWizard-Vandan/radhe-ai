@@ -33,7 +33,7 @@
 - [ ] Add `radhe update` test using mocked GitHub response — factor version comparison into pure function
 - [ ] Add regression test for ChatML prompt + stop-string logic
 - [ ] Audit error messages for `--summarize`, `--quiz-file`, `--fix`, `update` — make them consistent and friendly
-- [ ] Add `RADHE_DEBUG=1` env flag to print prompts, paths, and llama.cpp commands without affecting normal users
+- [x] Add `RADHE_DEBUG=1` env flag to print prompts, paths, and llama.cpp commands without affecting normal users
 
 ### Docs Hygiene
 - [ ] Backfill CHANGELOG with proper entries for v0.4.0 and v0.5.0
