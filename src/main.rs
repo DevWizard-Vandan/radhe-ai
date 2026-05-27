@@ -54,6 +54,79 @@ fn find_pack(name: &str) -> Option<PathBuf> {
     None
 }
 
+fn run_create_pack() {
+    use std::io::{BufRead, Write};
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    writeln!(out, "\n\x1b[36m[Radhe] Custom Pack Creator\x1b[0m").unwrap();
+    writeln!(out, "────────────────────────────────────────").unwrap();
+    // Pack name
+    write!(out, "Pack name (e.g. history, economics): ").unwrap();
+    out.flush().unwrap();
+    let mut name = String::new();
+    stdin.lock().read_line(&mut name).unwrap();
+    let name = name.trim().to_lowercase().replace(' ', "_");
+    if name.is_empty() { eprintln!("Error: Pack name cannot be empty."); return; }
+    // Display name
+    write!(out, "Display name (e.g. History, Economics): ").unwrap();
+    out.flush().unwrap();
+    let mut display = String::new();
+    stdin.lock().read_line(&mut display).unwrap();
+    let display = display.trim().to_string();
+    // Topics
+    writeln!(out, "Enter topics (one per line, blank line to finish):").unwrap();
+    let mut topics: Vec<String> = Vec::new();
+    loop {
+        write!(out, "  Topic: ").unwrap();
+        out.flush().unwrap();
+        let mut t = String::new();
+        stdin.lock().read_line(&mut t).unwrap();
+        let t = t.trim().to_string();
+        if t.is_empty() { break; }
+        topics.push(t);
+    }
+    // Key formulas / facts
+    writeln!(out, "Enter key facts or formulas (one per line, blank line to finish):").unwrap();
+    let mut facts: Vec<String> = Vec::new();
+    loop {
+        write!(out, "  Fact: ").unwrap();
+        out.flush().unwrap();
+        let mut f = String::new();
+        stdin.lock().read_line(&mut f).unwrap();
+        let f = f.trim().to_string();
+        if f.is_empty() { break; }
+        facts.push(f);
+    }
+    // Quiz style
+    write!(out, "Quiz style (e.g. MCQ, short answer, NCERT-style): ").unwrap();
+    out.flush().unwrap();
+    let mut quiz = String::new();
+    stdin.lock().read_line(&mut quiz).unwrap();
+    let quiz = quiz.trim().to_string();
+    // Build markdown
+    let mut md = format!("# {} Pack — Radhe AI\n\n", display);
+    md.push_str("## Topics\n");
+    for t in &topics { md.push_str(&format!("- {}\n", t)); }
+    if !facts.is_empty() {
+        md.push_str("\n## Key Facts / Formulas\n");
+        for f in &facts { md.push_str(&format!("- {}\n", f)); }
+    }
+    if !quiz.is_empty() {
+        md.push_str(&format!("\n## Quiz Style\n{}\n", quiz));
+    }
+    // Save to ~/.radhe/packs/<name>.md
+    let pack_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".radhe")
+        .join("packs");
+    std::fs::create_dir_all(&pack_dir).ok();
+    let pack_path = pack_dir.join(format!("{}.md", name));
+    std::fs::write(&pack_path, &md).unwrap();
+    writeln!(out, "\n\x1b[32m[Radhe] Pack saved: {}\x1b[0m", pack_path.display()).unwrap();
+    writeln!(out, "Use it with: radhe --pack {}", name).unwrap();
+}
+
 fn run_list_packs() -> Result<()> {
     let mut packs = std::collections::BTreeSet::new();
 
@@ -169,6 +242,10 @@ struct Cli {
 
     #[arg(long)]
     list_packs: bool,
+
+    /// Launch interactive wizard to create a custom subject pack
+    #[arg(long = "create-pack")]
+    create_pack: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -221,6 +298,11 @@ max_tokens = 300
     if cli.list_packs {
         run_list_packs()?;
         std::process::exit(0);
+    }
+
+    if cli.create_pack {
+        run_create_pack();
+        return Ok(());
     }
 
     if let Some(ref path) = cli.summarize {
@@ -1390,6 +1472,7 @@ mod tests {
             max_tokens: None,
             pack: None,
             list_packs: false,
+            create_pack: false,
         };
         let p = build_prompt(&cli).unwrap();
         assert!(p.contains("coding assistant"), "should contain coding assistant");
@@ -1415,6 +1498,7 @@ mod tests {
             max_tokens: None,
             pack: None,
             list_packs: false,
+            create_pack: false,
         };
         let p = build_prompt(&cli).unwrap();
         assert!(p.contains("Explain 'recursion' in exactly 5 bullet points"), "should format explanation prompt");

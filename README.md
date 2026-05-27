@@ -57,6 +57,12 @@ radhe --list-packs
 ```
 Install a custom pack by dropping any `.md` file into `~/.radhe/packs/`.
 
+### Create a Custom Pack
+```bash
+radhe --create-pack
+```
+Follow the interactive prompts to set topics, key facts, and quiz style. The pack is saved to `~/.radhe/packs/` and immediately available via `radhe --pack <name>`.
+
 ## Requirements
 - Windows 10/11
 - ~1.5GB free disk space (for model)

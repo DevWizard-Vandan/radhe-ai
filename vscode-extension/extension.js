@@ -67,6 +67,14 @@ function activate(context) {
       });
     })
   );
+  // Command 4: Create Custom Pack
+  context.subscriptions.push(
+    vscode.commands.registerCommand('radhe.createPack', () => {
+      const terminal = vscode.window.createTerminal('Radhe: Create Pack');
+      terminal.show();
+      terminal.sendText(`${getRadheBin()} --create-pack`);
+    })
+  );
 }
 function deactivate() {}
 module.exports = { activate, deactivate };
