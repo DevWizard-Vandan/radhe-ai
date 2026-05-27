@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use serde::Deserialize;
 use std::{
     fs,
@@ -332,10 +333,24 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
     if let Some(file_path_str) = &cli.fix {
         let path = PathBuf::from(file_path_str);
         if !path.exists() {
-            anyhow::bail!("File not found: {file_path_str}. Please provide a valid file path.");
+            eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+            eprintln!("{}: Check the file path and try again.", "Hint".yellow());
+            std::process::exit(1);
         }
-        let code = fs::read_to_string(&path)
-            .with_context(|| format!("unable to read file: {file_path_str}"))?;
+        let code = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => {
+                eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+                eprintln!("{}: Check the file path and try again.", "Hint".yellow());
+                std::process::exit(1);
+            }
+        };
+        let trimmed_code = code.trim();
+        if trimmed_code.is_empty() {
+            eprintln!("{}: File '{}' is empty.", "Error".red(), file_path_str);
+            eprintln!("{}: Nothing to fix — add some code first.", "Hint".yellow());
+            std::process::exit(1);
+        }
 
         // Strip any line containing // bug: or # bug: before building the prompt
         let cleaned_code_lines: Vec<&str> = code
@@ -373,19 +388,22 @@ FIXED CODE:\n",
     if let Some(file_path_str) = &cli.summarize {
         let path = PathBuf::from(file_path_str);
         if !path.exists() {
-            eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+            eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+            eprintln!("{}: Check the file path and try again.", "Hint".yellow());
             std::process::exit(1);
         }
         let content = match fs::read_to_string(&path) {
             Ok(c) => c,
             Err(_) => {
-                eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+                eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+                eprintln!("{}: Check the file path and try again.", "Hint".yellow());
                 std::process::exit(1);
             }
         };
         let trimmed_content = content.trim();
         if trimmed_content.is_empty() {
-            eprintln!("Error: File is empty.");
+            eprintln!("{}: File '{}' is empty.", "Error".red(), file_path_str);
+            eprintln!("{}: Add some notes to the file first.", "Hint".yellow());
             std::process::exit(1);
         }
         let truncated: String = trimmed_content.chars().take(3000).collect();
@@ -402,19 +420,22 @@ Notes:
     if let Some(file_path_str) = &cli.quiz_file {
         let path = PathBuf::from(file_path_str);
         if !path.exists() {
-            eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+            eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+            eprintln!("{}: Check the file path and try again.", "Hint".yellow());
             std::process::exit(1);
         }
         let content = match fs::read_to_string(&path) {
             Ok(c) => c,
             Err(_) => {
-                eprintln!("Error: Could not read file '{}'. Does it exist?", file_path_str);
+                eprintln!("{}: Could not read file '{}'", "Error".red(), file_path_str);
+                eprintln!("{}: Check the file path and try again.", "Hint".yellow());
                 std::process::exit(1);
             }
         };
         let trimmed_content = content.trim();
         if trimmed_content.is_empty() {
-            eprintln!("Error: File is empty.");
+            eprintln!("{}: File '{}' is empty.", "Error".red(), file_path_str);
+            eprintln!("{}: Add some notes to the file first.", "Hint".yellow());
             std::process::exit(1);
         }
         let truncated: String = trimmed_content.chars().take(3000).collect();
@@ -465,12 +486,19 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
     } else {
         format!("{model}.gguf")
     };
-    let model_path = dirs::home_dir()
+    let model_path_buf = dirs::home_dir()
         .context("unable to find user home directory")?
         .join(".radhe")
         .join("models")
         .join(&model_filename);
-    let model_path = model_path.to_string_lossy().into_owned();
+
+    if !model_path_buf.exists() {
+        eprintln!("{}: Model file '{}' not found in ~/.radhe/models/", "Error".red(), model_filename);
+        eprintln!("{}: Run 'radhe models' to see available models.", "Hint".yellow());
+        std::process::exit(1);
+    }
+
+    let model_path = model_path_buf.to_string_lossy().into_owned();
 
     debug_log(&format!("Prompt ({} chars): {}", prompt.len(), &prompt[..prompt.len().min(200)]));
 
@@ -1061,12 +1089,16 @@ fn run_update() -> Result<()> {
     let output = match ps_output {
         Ok(out) => out,
         Err(_) => {
-            anyhow::bail!("Update check failed. Are you connected to the internet?");
+            eprintln!("{}: Could not reach GitHub API.", "Error".red());
+            eprintln!("{}: Check your internet connection and try again.", "Hint".yellow());
+            std::process::exit(1);
         }
     };
 
     if !output.status.success() {
-        anyhow::bail!("Update check failed. Are you connected to the internet?");
+        eprintln!("{}: Could not reach GitHub API.", "Error".red());
+        eprintln!("{}: Check your internet connection and try again.", "Hint".yellow());
+        std::process::exit(1);
     }
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -1078,7 +1110,9 @@ fn run_update() -> Result<()> {
     debug_log(&format!("Latest version from API: {}", latest_version));
 
     if latest_version.is_empty() {
-        anyhow::bail!("Update check failed. Are you connected to the internet?");
+        eprintln!("{}: Could not reach GitHub API.", "Error".red());
+        eprintln!("{}: Check your internet connection and try again.", "Hint".yellow());
+        std::process::exit(1);
     }
 
     if current_version == latest_version {
@@ -1108,7 +1142,9 @@ fn run_update() -> Result<()> {
     };
 
     if !download_success {
-        anyhow::bail!("Download failed. Please try again or update manually.");
+        eprintln!("{}: Failed to download new binary.", "Error".red());
+        eprintln!("{}: Try again later or download manually from github.com/DevWizard-Vandan/radhe-ai/releases", "Hint".yellow());
+        std::process::exit(1);
     }
 
     // Replace the current binary
