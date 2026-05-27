@@ -24,6 +24,13 @@ irm https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/install.ps1
 ```
 This installs `radhe.exe` and downloads the default model (~1GB). Restart your terminal after install.
 
+### Linux / macOS
+Open your terminal and run:
+```bash
+curl -fsSL https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/install.sh | bash
+```
+This installs `radhe` and downloads the default model (~1GB). Restart your terminal after install.
+
 ## Usage Examples
 ```powershell
 # Explain a concept
