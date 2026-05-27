@@ -143,7 +143,7 @@ Allows easy personalization of model preferences and bounds.
   ```toml
   # Radhe AI Configuration
   # Change model to use a different GGUF file from ~/.radhe/models/
-  model = "qwen2.gguf"
+  model = "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
   max_tokens = 300
   ```
 * **CLI Flag**: `radhe --model <FILENAME> [--max-tokens <NUMBER>]`
@@ -184,16 +184,50 @@ Summarizes student notes or visual text logs into 5 clear, structured revision b
 ---
 
 ## 13. Persistent Conversation Chat Mode (`--chat`)
-Enters an interactive chat wrapper that remembers rolling context up to the last 6 turns.
+Enters an interactive chat wrapper that remembers rolling context up to the last 6 turns using native ChatML format matching Qwen instruct models.
 
 * **CLI Argument**: `radhe --chat`
 * **Token Limit**: Exactly `300` tokens per response.
-* **Underlying Prompt Engineering**:
+* **Underlying Prompt Engineering (ChatML)**:
   ```text
-  You are Radhe, a helpful AI assistant for students. Be concise and clear.
-  
-  [Rolling history of last 6 turns]
-  User: {input}
-  Assistant:
+  <|im_start|>system
+  You are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.<|im_end|>
+  <|im_start|>user
+  {user_turn_1}<|im_end|>
+  <|im_start|>assistant
+  {assistant_turn_1}<|im_end|>
+  ...
+  <|im_start|>user
+  {input}<|im_end|>
+  <|im_start|>assistant
   ```
 * **Control Commands**: Type `exit` or `quit` to exit session.
+
+---
+
+## 14. Quiz Generation from File (`--quiz-file`)
+Generates 5 conceptual multiple-choice quiz questions and answers directly from the student's revision notes file.
+
+* **CLI Argument**: `radhe --quiz-file <filepath>`
+* **Token Limit**: Exactly `400` tokens.
+* **Underlying Prompt Engineering**:
+  ```text
+  You are a student quiz generator. Based on the following notes, generate exactly 5 quiz questions with answers. Format each as:
+  Q1: [question]
+  A1: [answer]
+  Q2: [question]
+  A2: [answer]
+  ... and so on until Q5/A5.
+
+  Notes:
+  {file_contents}
+  ```
+* **Output Processing**: Prints the result directly to the terminal, and limits input context to the first 3000 characters.
+
+---
+
+## 15. Immediate Version Check (`--version`)
+Prints the CLI binary version and the currently active GGUF model immediately without running inference or loading the model.
+
+* **CLI Argument**: `radhe --version`
+* **Behavior Description**: Bypasses directory setup, config creations, GGUF loading, and llama.cpp subprocess spawns. Reads and prints `Radhe AI v<version>` and `Model: <model_name>` (resolving CLI flags or `config.toml` defaults) and exits instantly.

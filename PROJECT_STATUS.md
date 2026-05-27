@@ -6,12 +6,20 @@ This document highlights the current developmental health, active milestones, an
 
 ## Active Release Status
 
-* **Current Stable Version**: `v0.3.0` (Interactive quiz, model configuration, models, update, and summarize subcommands)
-* **Status**: :white_check_mark: Active development / v0.3.0 successfully launched.
+* **Current Stable Version**: `v0.5.0` (Persistent chat, quiz file generation, models, update, and summarize subcommands)
+* **Status**: :white_check_mark: Active development / v0.5.0 successfully launched.
 
 ---
 
 ## Milestones Dashboard
+
+### :checkered_flag: Milestone 0.4.0: Persistent Chat & Quiz From File (Completed)
+* [x] **Persistent chat mode via `--chat`**: 6-turn rolling context window to preserve interactive dialogue history.
+* [x] **ChatML prompt format for Qwen instruct models**: Native support for delimiters (`<|im_start|>`/`<|im_end|>`) matching Qwen instruct models.
+* [x] **Fixed context history passing across turns**: Robust prompt stripping preventing conversation turn boundary hallucination.
+* [x] **`--quiz-file`**: Generate quiz questions from student notes files.
+* [x] **`--version` flag**: Prints version + active model instantly.
+* [x] **Enhanced doctor**: Version header, active model validation, colored output.
 
 ### :checkered_flag: Milestone 0.3.0: File Summarization & Self-Updates (Completed)
 * [x] **File Summarization (`--summarize`)**: Truncates inputs to 3000 characters and generates structured 5-bullet summary notes.
@@ -33,13 +41,13 @@ This document highlights the current developmental health, active milestones, an
 * [x] **Interactive REPL Mode**: Colored welcome headers, green prompt, standard commands (`/exit`, `/clear`), and `Ctrl+C` interrupt handlers.
 * [x] **Environment Diagnostics**: `doctor` mode checks paths and validates local model downloads.
 
-### :rocket: Milestone 0.2.0: The Student Installer (In Progress)
-* [ ] **Automated Powershell Installer**: Create `install.ps1` to download `llama-completion.exe` and `qwen2.gguf` automatically to the standard directories.
-* [ ] **Automated Shell Installer**: Create `install.sh` for Linux/macOS compatibility.
-* [ ] **Pre-compiled Binary Bundles**: Release pre-built platform-dependent packages via GitHub Releases.
-* [ ] **Unified Setup Directory**: Establish directory creation during install inside the user's home folder `~/.radhe`.
+### :checkered_flag: Milestone 0.2.0: The Student Installer (Completed)
+* [x] **Automated PowerShell installer (`install.ps1`)**: Downloads `radhe.exe`, `llama.cpp`, advanced Qwen 1.5B model, updates PATH.
+* [x] **Pre-compiled binary bundles**: pre-compiled packages released via GitHub Releases (Windows + Linux).
+* [x] **Unified `~/.radhe` directory structure**: Establishes automatic setup and scanner bounds in `~/.radhe`.
+* [ ] **Automated Shell Installer (`install.sh`)**: Create `install.sh` for Linux/macOS compatibility.
 
-### :bulb: Milestone 0.4.0: Hindi Support & Editor Integrations (Planned)
+### :bulb: Milestone 0.5.0: Hindi Support & Editor Integrations (Planned)
 * [ ] **Multilingual Prompt Templates**: Add Hindi-English (Hinglish) support for explanation and student notes modes.
 * [ ] **VS Code Extension**: Lightweight extension to invoke the local model using keyboard shortcut bindings.
 * [ ] **Vim/Neovim Plugin**: Simple Lua script to pipe marked visual blocks straight through `radhe --fix`.
