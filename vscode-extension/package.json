@@ -1,0 +1,28 @@
+{
+  "name": "radhe-ai",
+  "displayName": "Radhe AI",
+  "description": "Offline AI assistant for students — powered by local Qwen model",
+  "version": "0.1.0",
+  "publisher": "DevWizard-Vandan",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Education", "Other"],
+  "activationEvents": ["onCommand:radhe.explain", "onCommand:radhe.fix", "onCommand:radhe.quiz"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "radhe.explain", "title": "Radhe: Explain Selection" },
+      { "command": "radhe.fix", "title": "Radhe: Fix Selection" },
+      { "command": "radhe.quiz", "title": "Radhe: Generate Quiz from File" }
+    ],
+    "configuration": {
+      "title": "Radhe AI",
+      "properties": {
+        "radhe.binaryPath": {
+          "type": "string",
+          "default": "radhe",
+          "description": "Path to the radhe binary (default: 'radhe' assumes it's in PATH)"
+        }
+      }
+    }
+  }
+}
