@@ -14,6 +14,15 @@ fn debug_log(msg: &str) {
     }
 }
 
+fn clean_path(path: &std::path::Path) -> String {
+    let s = path.to_string_lossy().into_owned();
+    if s.starts_with("\\\\?\\") {
+        s[4..].to_string()
+    } else {
+        s
+    }
+}
+
 #[derive(Deserialize, Default, Debug)]
 struct RadheConfig {
     model: Option<String>,
@@ -117,7 +126,7 @@ max_tokens = 300
     if let Some(ref path) = cli.summarize {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
-        let resolved = abs_path.to_string_lossy().into_owned();
+        let resolved = clean_path(&abs_path);
         debug_log(&format!("Resolved path: {}", resolved));
         cli.summarize = Some(resolved);
     }
@@ -125,13 +134,13 @@ max_tokens = 300
     if let Some(ref path) = cli.fix {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
-        cli.fix = Some(abs_path.to_string_lossy().into_owned());
+        cli.fix = Some(clean_path(&abs_path));
     }
 
     if let Some(ref path) = cli.quiz_file {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
-        let resolved = abs_path.to_string_lossy().into_owned();
+        let resolved = clean_path(&abs_path);
         debug_log(&format!("Resolved path: {}", resolved));
         cli.quiz_file = Some(resolved);
     }
