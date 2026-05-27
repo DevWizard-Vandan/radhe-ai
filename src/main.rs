@@ -1155,6 +1155,56 @@ fn run_chat(active_model: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_prompt_code() {
+        let cli = Cli {
+            command: None,
+            version: false,
+            prompt: None,
+            code: Some("bubble sort in c".to_string()),
+            explain: None,
+            notes: None,
+            fix: None,
+            summarize: None,
+            chat: false,
+            quiz: None,
+            quiz_file: None,
+            count: None,
+            model: None,
+            max_tokens: None,
+        };
+        let p = build_prompt(&cli).unwrap();
+        assert!(p.contains("coding assistant"), "should contain coding assistant");
+        assert!(p.contains("bubble sort in c"), "should contain prompt text");
+    }
+
+    #[test]
+    fn test_build_prompt_explain() {
+        let cli = Cli {
+            command: None,
+            version: false,
+            prompt: None,
+            code: None,
+            explain: Some("recursion".to_string()),
+            notes: None,
+            fix: None,
+            summarize: None,
+            chat: false,
+            quiz: None,
+            quiz_file: None,
+            count: None,
+            model: None,
+            max_tokens: None,
+        };
+        let p = build_prompt(&cli).unwrap();
+        assert!(p.contains("Explain 'recursion' in exactly 5 bullet points"), "should format explanation prompt");
+    }
+}
+
 
 
 

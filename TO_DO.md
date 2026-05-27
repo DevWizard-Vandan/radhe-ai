@@ -7,17 +7,17 @@
 ## 🔴 Do Tomorrow (High Priority)
 
 ### Docs & Status Alignment
-- [ ] Update `PROJECT_STATUS.md` — set current stable to `v0.5.0`, add v0.4.0 and v0.5.0 milestone entries, mark Windows installer tasks as complete
-- [ ] Update `FEATURE_LIST.md` — fix config example (`qwen2.gguf` → `Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf`), add `--quiz-file` section, update `--chat` to show ChatML prompt format
-- [ ] Check README features table includes `--quiz-file` row with example call
+- [x] Update `PROJECT_STATUS.md` — set current stable to `v0.5.0`, add v0.4.0 and v0.5.0 milestone entries, mark Windows installer tasks as complete
+- [x] Update `FEATURE_LIST.md` — fix config example (`qwen2.gguf` → `Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf`), add `--quiz-file` section, update `--chat` to show ChatML prompt format
+- [x] Check README features table includes `--quiz-file` row with example call
 
 ### Quick CLI Improvements
-- [ ] Add `radhe --version` — print `Radhe AI vX.Y.Z` + active model name using `env!("CARGO_PKG_VERSION")`
-- [ ] Enhance `radhe doctor` — check for `Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf` instead of `qwen2.gguf`, confirm binary version, validate llama.cpp health
+- [x] Add `radhe --version` — print `Radhe AI vX.Y.Z` + active model name using `env!("CARGO_PKG_VERSION")`
+- [x] Enhance `radhe doctor` — check for `Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf` instead of `qwen2.gguf`, confirm binary version, validate llama.cpp health
 
 ### Seed Tests
-- [ ] Add `tests/cli_smoke.rs` — test CLI parsing for `--summarize`, `--quiz-file`, `--chat` without inference
-- [ ] Add unit tests for prompt builder functions (verify "exactly 5 questions", "Q1/A1 format" strings are present)
+- [x] Add `tests/cli_smoke.rs` — test CLI parsing for `--summarize`, `--quiz-file`, `--chat` without inference
+- [x] Add unit tests for prompt builder functions (verify "exactly 5 questions", "Q1/A1 format" strings are present)
 
 ---
 
