@@ -1,4 +1,17 @@
 # Changelog
+## [v0.7.0] — 2026-05-27
+- feat: `--lang hi|hinglish` — response language mode (Hindi, Hinglish, English)
+- feat: `--set-lang <lang>` — persist default language in `config.toml`
+- feat: language mode in `radhe doctor` diagnostics
+- feat: VS Code extension `radhe.language` setting
+- feat: language support in `--chat`, `--pack`, and all prompt modes
+
+## [v0.6.0] — 2026-05-27
+- feat: `--pack <name>` — load subject packs for tuned responses
+- feat: `--list-packs` — show available subject packs
+- feat: `--create-pack` — interactive custom pack wizard
+- feat: `install.sh` — one-line Linux/macOS installer
+
 ## [v0.5.0] — 2026-05-26
 - feat: `--quiz-file <file>` — generate quiz questions from student notes
 - feat: `--version` — print version and active model instantly

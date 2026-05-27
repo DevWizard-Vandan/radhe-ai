@@ -3,9 +3,14 @@ const { execFile } = require('child_process');
 function getRadheBin() {
   return vscode.workspace.getConfiguration('radhe').get('binaryPath', 'radhe');
 }
+function getLangArgs() {
+  const lang = vscode.workspace.getConfiguration('radhe').get('language', 'en');
+  return lang && lang !== 'en' ? ['--lang', lang] : [];
+}
 function runRadhe(args, input, callback) {
   const bin = getRadheBin();
-  const proc = execFile(bin, args, (err, stdout, stderr) => {
+  const fullArgs = [...args, ...getLangArgs()];
+  const proc = execFile(bin, fullArgs, (err, stdout, stderr) => {
     if (err) {
       vscode.window.showErrorMessage(`Radhe Error: ${stderr || err.message}`);
       return;

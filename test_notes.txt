@@ -1,0 +1,1 @@
+﻿Operating systems manage hardware resources. Processes are programs in execution. Scheduling algorithms include FCFS, SJF, and Round Robin. Virtual memory allows programs to use more memory than physically available. Deadlocks occur when processes wait for each other indefinitely.

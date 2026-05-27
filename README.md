@@ -12,6 +12,8 @@
 | `radhe --quiz-file <file>` | Generate quiz questions from a notes file |
 | `radhe --summarize <file>` | Summarize a text file into 5 bullets |
 | `radhe --chat` | Start a persistent conversation |
+| `radhe --lang hi` | Response in Hindi (also: `hinglish`) |
+| `radhe --set-lang hinglish` | Set default language permanently |
 | `radhe update` | Self-update to the latest version |
 | `radhe models` | List installed models |
 | `radhe doctor` | Check installation health |
@@ -62,6 +64,26 @@ Install a custom pack by dropping any `.md` file into `~/.radhe/packs/`.
 radhe --create-pack
 ```
 Follow the interactive prompts to set topics, key facts, and quiz style. The pack is saved to `~/.radhe/packs/` and immediately available via `radhe --pack <name>`.
+
+## Language Mode 🌐
+Radhe supports English, Hindi, and Hinglish responses:
+
+| Language | Flag | Description |
+|----------|------|-------------|
+| English | `--lang en` | Default, clear English |
+| Hindi | `--lang hi` | Devanagari script Hindi |
+| Hinglish | `--lang hinglish` | Casual mix of Hindi + English in Roman script |
+
+Set your default language permanently:
+```bash
+radhe --set-lang hinglish
+```
+
+Or use it per-command:
+```bash
+radhe --explain "binary search" --lang hi
+radhe --chat --lang hinglish
+```
 
 ## Requirements
 - Windows 10/11

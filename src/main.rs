@@ -24,6 +24,14 @@ fn clean_path(path: &std::path::Path) -> String {
     }
 }
 
+fn lang_system_prompt(lang: &str) -> &'static str {
+    match lang {
+        "hi" => "You are Radhe, an AI assistant. Always respond in simple Hindi (Devanagari script). Use clear, student-friendly language. Avoid complex Sanskrit terms — prefer everyday Hindi words.",
+        "hinglish" => "You are Radhe, an AI assistant. Always respond in Hinglish — a natural mix of Hindi and English commonly used by Indian students. Write Hindi words in Roman script (not Devanagari). Keep it casual and friendly, like explaining to a classmate.",
+        _ => "You are Radhe, a helpful AI assistant. Respond in clear, simple English.",
+    }
+}
+
 fn find_pack(name: &str) -> Option<PathBuf> {
     let filename = format!("{}.md", name);
 
@@ -189,6 +197,7 @@ fn run_list_packs() -> Result<()> {
 struct RadheConfig {
     model: Option<String>,
     max_tokens: Option<u32>,
+    lang: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -246,6 +255,14 @@ struct Cli {
     /// Launch interactive wizard to create a custom subject pack
     #[arg(long = "create-pack")]
     create_pack: bool,
+
+    /// Response language: 'en' (default), 'hi' (Hindi), 'hinglish' (mixed Hindi+English)
+    #[arg(long = "lang", value_name = "LANG")]
+    lang: Option<String>,
+
+    /// Set default language in config: 'en', 'hi', or 'hinglish'
+    #[arg(long = "set-lang", value_name = "LANG")]
+    set_lang: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -295,6 +312,38 @@ max_tokens = 300
         std::process::exit(0);
     }
 
+    // Handle --set-lang early
+    if let Some(ref new_lang) = cli.set_lang {
+        let valid = ["en", "hi", "hinglish"];
+        if !valid.contains(&new_lang.as_str()) {
+            eprintln!("{}: Invalid language '{}'. Valid options: en, hi, hinglish", "Error".red(), new_lang);
+            eprintln!("{}: Use --set-lang en, --set-lang hi, or --set-lang hinglish", "Hint".yellow());
+            std::process::exit(1);
+        }
+        // Read existing config and update lang line
+        let content = fs::read_to_string(&config_path).unwrap_or_default();
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        let mut found_lang = false;
+        for line in lines.iter_mut() {
+            if line.starts_with("lang") && line.contains('=') {
+                *line = format!("lang = \"{}\"", new_lang);
+                found_lang = true;
+                break;
+            }
+        }
+        if !found_lang {
+            lines.push(format!("lang = \"{}\"", new_lang));
+        }
+        fs::write(&config_path, lines.join("\n") + "\n")?;
+        let label = match new_lang.as_str() {
+            "hi" => "Hindi",
+            "hinglish" => "Hinglish",
+            _ => "English",
+        };
+        println!("Language set to {} ({}). All future responses will use this language.", label, new_lang);
+        std::process::exit(0);
+    }
+
     if cli.list_packs {
         run_list_packs()?;
         std::process::exit(0);
@@ -337,7 +386,13 @@ max_tokens = 300
         .or(config.max_tokens)
         .unwrap_or(300);
 
-    debug_log(&format!("Config loaded — model: {}, max_tokens: {}", active_model, active_max_tokens));
+    // Resolve language: CLI flag > config.toml > default "en"
+    let active_lang = cli.lang
+        .clone()
+        .or_else(|| config.lang.clone())
+        .unwrap_or_else(|| "en".to_string());
+
+    debug_log(&format!("Config loaded — model: {}, max_tokens: {}, lang: {}", active_model, active_max_tokens, active_lang));
 
     if let Some(ref pack_name) = cli.pack {
         let pack_path = find_pack(pack_name);
@@ -380,7 +435,12 @@ max_tokens = 300
             std::process::exit(0);
         }
 
-        let prompt = format!("<|im_start|>system\n{}\n<|im_end|>\n<|im_start|>user\n{}\n<|im_end|>\n<|im_start|>assistant\n", pack_content, question);
+        let lang_prefix = if active_lang != "en" {
+            format!("\n\n{}", lang_system_prompt(&active_lang))
+        } else {
+            String::new()
+        };
+        let prompt = format!("<|im_start|>system\n{}{}\n<|im_end|>\n<|im_start|>user\n{}\n<|im_end|>\n<|im_start|>assistant\n", pack_content, lang_prefix, question);
         let max_tokens = active_max_tokens.max(500);
 
         let output = run_inference(&prompt, &active_model, max_tokens, "chat")
@@ -397,7 +457,7 @@ max_tokens = 300
             return Ok(());
         }
         Some(Commands::Doctor) => {
-            run_doctor(&active_model);
+            run_doctor(&active_model, &active_lang);
             return Ok(());
         }
         Some(Commands::Models) => {
@@ -447,11 +507,11 @@ max_tokens = 300
     };
 
     if mode == "chat" {
-        run_chat(&active_model)?;
+        run_chat(&active_model, &active_lang)?;
         return Ok(());
     }
 
-    let prompt = build_prompt(&cli)?;
+    let prompt = build_prompt(&cli, &active_lang)?;
     let max_tokens = match mode {
         "code" => 300,
         "explain" => 200,
@@ -496,7 +556,12 @@ max_tokens = 300
     Ok(())
 }
 
-fn build_prompt(cli: &Cli) -> Result<String> {
+fn build_prompt(cli: &Cli, lang: &str) -> Result<String> {
+    let lang_suffix = if lang != "en" {
+        format!("\n\n{}", lang_system_prompt(lang))
+    } else {
+        String::new()
+    };
     if let Some(task) = &cli.code {
         let has_lang_hint = task
             .to_lowercase()
@@ -537,14 +602,14 @@ fn build_prompt(cli: &Cli) -> Result<String> {
         }
 
         return Ok(format!(
-            "You are a coding assistant. Return ONLY valid compilable code with zero explanation. No markdown, no backticks, no comments. Just raw code.
-Task: {task_str}"
+            "You are a coding assistant. Return ONLY valid compilable code with zero explanation. No markdown, no backticks, no comments. Just raw code.{}
+Task: {task_str}", lang_suffix
         ));
     }
 
     if let Some(topic) = &cli.explain {
         return Ok(format!(
-            "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:"
+            "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.{}\n\nExplanation:", lang_suffix
         ));
     }
 
@@ -557,7 +622,7 @@ Task: {task_str}"
 - [fact 4]
 - [fact 5]
 - [fact 6]
-Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{}", lang_suffix
         ));
     }
 
@@ -615,6 +680,7 @@ FIXED CODE:\n",
             language, cleaned_code
         ));
     }
+    // Note: --fix mode intentionally does NOT apply lang_suffix since output must be raw code.
 
     if let Some(file_path_str) = &cli.summarize {
         let path = PathBuf::from(file_path_str);
@@ -640,11 +706,11 @@ FIXED CODE:\n",
         let truncated: String = trimmed_content.chars().take(3000).collect();
 
         return Ok(format!(
-            "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).
+            "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).{}
 
 Notes:
 {}",
-            truncated
+            lang_suffix, truncated
         ));
     }
 
@@ -677,11 +743,11 @@ Q1: [question]
 A1: [answer]
 Q2: [question]
 A2: [answer]
-... and so on until Q5/A5.
+... and so on until Q5/A5.{}
 
 Notes:
 {}",
-            truncated
+            lang_suffix, truncated
         ));
     }
 
@@ -697,14 +763,14 @@ d) [option]
 Answer: [single letter a/b/c/d]
 Q2: [question text]
 ...
-Only output the questions. No intro, no explanation."
+Only output the questions. No intro, no explanation.{}", lang_suffix
         ));
     }
 
     if let Some(prompt) = &cli.prompt {
         return Ok(format!(
-            "You are Radhe AI, a tiny offline terminal assistant for students. Be concise and practical.
-User: {prompt}"
+            "You are Radhe AI, a tiny offline terminal assistant for students. Be concise and practical.{}
+User: {prompt}", lang_suffix
         ));
     }
 
@@ -950,7 +1016,7 @@ fn init_dirs() -> Result<()> {
     Ok(())
 }
 
-fn run_doctor(active_model: &str) {
+fn run_doctor(active_model: &str, active_lang: &str) {
     use colored::Colorize;
 
     let version = env!("CARGO_PKG_VERSION");
@@ -995,6 +1061,17 @@ fn run_doctor(active_model: &str) {
     // 3. Model warning if not default 1.5B
     if active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf" && active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M" {
         println!("{}", format!("! Warning: Using non-default model ({})", active_model).yellow());
+    }
+
+    // 5. Print language setting
+    let lang_label = match active_lang {
+        "hi" => "Hindi",
+        "hinglish" => "Hinglish",
+        _ => "English",
+    };
+    println!("{}", format!("✓ Language: {} ({})", lang_label, active_lang).green());
+    if active_lang != "en" {
+        println!("{}", format!("  Tip: Reset with --set-lang en").dimmed());
     }
 
     // 4. Print final status
@@ -1391,7 +1468,7 @@ fn run_update() -> Result<()> {
     Ok(())
 }
 
-fn run_chat(active_model: &str) -> Result<()> {
+fn run_chat(active_model: &str, active_lang: &str) -> Result<()> {
     println!("Radhe AI - Chat Mode");
     println!("Type 'exit' to quit.");
     println!("──────────────────────");
@@ -1416,8 +1493,13 @@ fn run_chat(active_model: &str) -> Result<()> {
             continue;
         }
 
-        // Build rolling prompt from history
-        let mut prompt = String::from("<|im_start|>system\nYou are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.<|im_end|>\n");
+        // Build rolling prompt from history with language support
+        let lang_instruction = if active_lang != "en" {
+            format!(" {}", lang_system_prompt(active_lang))
+        } else {
+            String::new()
+        };
+        let mut prompt = format!("<|im_start|>system\nYou are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.{}<|im_end|>\n", lang_instruction);
         for (u, a) in &history {
             prompt.push_str(&format!("<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{}<|im_end|>\n", u, a));
         }
@@ -1473,8 +1555,10 @@ mod tests {
             pack: None,
             list_packs: false,
             create_pack: false,
+            lang: None,
+            set_lang: None,
         };
-        let p = build_prompt(&cli).unwrap();
+        let p = build_prompt(&cli, "en").unwrap();
         assert!(p.contains("coding assistant"), "should contain coding assistant");
         assert!(p.contains("bubble sort in c"), "should contain prompt text");
     }
@@ -1499,8 +1583,10 @@ mod tests {
             pack: None,
             list_packs: false,
             create_pack: false,
+            lang: None,
+            set_lang: None,
         };
-        let p = build_prompt(&cli).unwrap();
+        let p = build_prompt(&cli, "en").unwrap();
         assert!(p.contains("Explain 'recursion' in exactly 5 bullet points"), "should format explanation prompt");
     }
 }

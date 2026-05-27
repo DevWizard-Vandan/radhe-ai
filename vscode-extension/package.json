@@ -52,6 +52,17 @@
           "type": "string",
           "default": "radhe",
           "description": "Path to the radhe binary (default: 'radhe' assumes it's in PATH)"
+        },
+        "radhe.language": {
+          "type": "string",
+          "default": "en",
+          "enum": ["en", "hi", "hinglish"],
+          "enumDescriptions": [
+            "English (default)",
+            "Hindi (Devanagari script)",
+            "Hinglish (mixed Hindi + English in Roman script)"
+          ],
+          "description": "Response language for Radhe AI"
         }
       }
     }
