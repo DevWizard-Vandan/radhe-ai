@@ -76,6 +76,12 @@ fn run_create_pack() {
     stdin.lock().read_line(&mut name).unwrap();
     let name = name.trim().to_lowercase().replace(' ', "_");
     if name.is_empty() { eprintln!("Error: Pack name cannot be empty."); return; }
+    // Sanitize: only allow alphanumeric, underscore, hyphen — no path separators
+    if name.chars().any(|c| !c.is_alphanumeric() && c != '_' && c != '-') {
+        eprintln!("{}: Pack name '{}' contains invalid characters.", "Error".red(), name);
+        eprintln!("{}: Use only letters, numbers, underscores, and hyphens.", "Hint".yellow());
+        return;
+    }
     // Display name
     write!(out, "Display name (e.g. History, Economics): ").unwrap();
     out.flush().unwrap();
@@ -130,7 +136,11 @@ fn run_create_pack() {
         .join("packs");
     std::fs::create_dir_all(&pack_dir).ok();
     let pack_path = pack_dir.join(format!("{}.md", name));
-    std::fs::write(&pack_path, &md).unwrap();
+    if let Err(e) = std::fs::write(&pack_path, &md) {
+        eprintln!("{}: Could not save pack file '{}': {}", "Error".red(), pack_path.display(), e);
+        eprintln!("{}: Check permissions for ~/.radhe/packs/ and try again.", "Hint".yellow());
+        return;
+    }
     writeln!(out, "\n\x1b[32m[Radhe] Pack saved: {}\x1b[0m", pack_path.display()).unwrap();
     writeln!(out, "Use it with: radhe --pack {}", name).unwrap();
 }
@@ -1094,7 +1104,7 @@ fn run_repl(model: &str) -> Result<()> {
     .context("Error setting Ctrl-C handler")?;
 
     // Print welcome header
-    println!("{}", "Radhe AI v0.1.0 — Offline Terminal Assistant".cyan().bold());
+    println!("{}", format!("Radhe AI v{} — Offline Terminal Assistant", env!("CARGO_PKG_VERSION")).cyan().bold());
     println!("{}", "Type your question, or prefix with --code / --explain / --notes".yellow());
     println!("{}", "/exit to quit, /clear to clear screen".yellow());
     println!();
