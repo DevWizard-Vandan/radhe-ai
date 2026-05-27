@@ -667,13 +667,26 @@ fn init_dirs() -> Result<()> {
 }
 
 fn run_doctor(active_model: &str) {
-    println!("- Active model: {active_model}");
-    println!("- Checking llama-completion.exe in PATH...");
+    use colored::Colorize;
+
+    let version = env!("CARGO_PKG_VERSION");
+    println!("Radhe AI v{}", version);
+    println!("Running diagnostics...");
+
+    let mut all_ok = true;
+
+    // 1. Check llama-completion.exe in PATH
     match Command::new("llama-completion.exe").arg("--help").output() {
-        Ok(_) => println!("  OK: llama-completion.exe found"),
-        Err(_) => println!("  MISSING: llama-completion.exe not found"),
+        Ok(_) => {
+            println!("{}", "✓ llama-completion.exe found".green());
+        }
+        Err(_) => {
+            println!("{}", "✗ llama-completion.exe not found".red());
+            all_ok = false;
+        }
     }
 
+    // 2. Check active model file in ~/.radhe/models/
     let model_filename = if active_model.ends_with(".gguf") {
         active_model.to_string()
     } else {
@@ -684,15 +697,27 @@ fn run_doctor(active_model: &str) {
         .map(|p| p.join(".radhe").join("models").join(&model_filename));
 
     if let Some(path) = &model_path {
-        println!("- Expected model path: {}", path.display());
         if path.exists() {
-            println!("  OK: model found");
+            println!("{}", format!("✓ Active model: {} (found)", active_model).green());
         } else {
-            println!("  MISSING: download model to ~/.radhe/models/{model_filename}");
+            println!("{}", format!("✗ Active model: {} (NOT FOUND — run: radhe models)", active_model).red());
+            all_ok = false;
         }
     } else {
-        println!("- Expected model path: unable to resolve home directory");
-        println!("  MISSING: download model to ~/.radhe/models/{model_filename}");
+        println!("{}", "✗ Expected model path: unable to resolve home directory".red());
+        all_ok = false;
+    }
+
+    // 3. Model warning if not default 1.5B
+    if active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf" && active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M" {
+        println!("{}", format!("! Warning: Using non-default model ({})", active_model).yellow());
+    }
+
+    // 4. Print final status
+    if all_ok {
+        println!("{}", "All systems operational.".green());
+    } else {
+        println!("{}", "✗ Systems check failed. Check the errors above.".red());
     }
 }
 
