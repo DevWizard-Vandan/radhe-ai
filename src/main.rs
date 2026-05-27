@@ -24,6 +24,94 @@ fn clean_path(path: &std::path::Path) -> String {
     }
 }
 
+fn find_pack(name: &str) -> Option<PathBuf> {
+    let filename = format!("{}.md", name);
+
+    // 1. Same directory as the current binary
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let path = parent.join("packs").join(&filename);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    // 2. Relative to current working directory
+    let cwd_path = PathBuf::from("packs").join(&filename);
+    if cwd_path.exists() {
+        return Some(cwd_path);
+    }
+
+    // 3. ~/.radhe/packs/
+    if let Some(home) = dirs::home_dir() {
+        let path = home.join(".radhe").join("packs").join(&filename);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+fn run_list_packs() -> Result<()> {
+    let mut packs = std::collections::BTreeSet::new();
+
+    // Check ./packs/
+    if let Ok(entries) = fs::read_dir("packs") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    packs.insert(stem.to_string());
+                }
+            }
+        }
+    }
+
+    // Check ~/.radhe/packs/
+    if let Some(home) = dirs::home_dir() {
+        let home_packs_dir = home.join(".radhe").join("packs");
+        if let Ok(entries) = fs::read_dir(home_packs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        packs.insert(stem.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Check same dir as binary
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let exe_packs_dir = parent.join("packs");
+            if let Ok(entries) = fs::read_dir(exe_packs_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            packs.insert(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if packs.is_empty() {
+        println!("No subject packs found.");
+    } else {
+        println!("Available subject packs:");
+        for pack in packs {
+            println!("  - {}", pack);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Deserialize, Default, Debug)]
 struct RadheConfig {
     model: Option<String>,
@@ -75,6 +163,12 @@ struct Cli {
 
     #[arg(long, value_name = "MAX_TOKENS")]
     max_tokens: Option<u32>,
+
+    #[arg(long, value_name = "NAME")]
+    pack: Option<String>,
+
+    #[arg(long)]
+    list_packs: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -124,6 +218,11 @@ max_tokens = 300
         std::process::exit(0);
     }
 
+    if cli.list_packs {
+        run_list_packs()?;
+        std::process::exit(0);
+    }
+
     if let Some(ref path) = cli.summarize {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
@@ -157,6 +256,56 @@ max_tokens = 300
         .unwrap_or(300);
 
     debug_log(&format!("Config loaded — model: {}, max_tokens: {}", active_model, active_max_tokens));
+
+    if let Some(ref pack_name) = cli.pack {
+        let pack_path = find_pack(pack_name);
+        if pack_path.is_none() {
+            eprintln!("{}: Pack file '{}.md' not found.", "Error".red(), pack_name);
+            eprintln!("{}: Run 'radhe --list-packs' to see available packs.", "Hint".yellow());
+            std::process::exit(1);
+        }
+        let pack_path = pack_path.unwrap();
+        let pack_content = match fs::read_to_string(&pack_path) {
+            Ok(content) => content,
+            Err(_) => {
+                eprintln!("{}: Could not read pack file '{}'", "Error".red(), pack_path.display());
+                eprintln!("{}: Check file permissions and try again.", "Hint".yellow());
+                std::process::exit(1);
+            }
+        };
+
+        let formatted_name = if pack_name.to_lowercase() == "cs" {
+            "CS".to_string()
+        } else {
+            let mut chars = pack_name.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        };
+
+        println!("[Radhe] Loaded {} Pack. Ask your question:", formatted_name);
+
+        use std::io;
+        let mut question = String::new();
+        if io::stdin().read_line(&mut question).is_err() {
+            eprintln!("{}: Failed to read question from stdin.", "Error".red());
+            std::process::exit(1);
+        }
+        let question = question.trim();
+        if question.is_empty() {
+            println!("No question asked. Exiting.");
+            std::process::exit(0);
+        }
+
+        let prompt = format!("<|im_start|>system\n{}\n<|im_end|>\n<|im_start|>user\n{}\n<|im_end|>\n<|im_start|>assistant\n", pack_content, question);
+        let max_tokens = active_max_tokens.max(500);
+
+        let output = run_inference(&prompt, &active_model, max_tokens, "chat")
+            .context("failed to run local inference")?;
+        println!("{}", output);
+        return Ok(());
+    }
 
     match cli.command {
         Some(Commands::Init) => {
@@ -1239,6 +1388,8 @@ mod tests {
             count: None,
             model: None,
             max_tokens: None,
+            pack: None,
+            list_packs: false,
         };
         let p = build_prompt(&cli).unwrap();
         assert!(p.contains("coding assistant"), "should contain coding assistant");
@@ -1262,6 +1413,8 @@ mod tests {
             count: None,
             model: None,
             max_tokens: None,
+            pack: None,
+            list_packs: false,
         };
         let p = build_prompt(&cli).unwrap();
         assert!(p.contains("Explain 'recursion' in exactly 5 bullet points"), "should format explanation prompt");

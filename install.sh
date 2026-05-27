@@ -42,8 +42,18 @@ if ! grep -q "$BIN_DIR" "$SHELL_RC" 2>/dev/null; then
 else
   echo "$BIN_DIR already in PATH."
 fi
+
+# Install default packs
+mkdir -p "$HOME/.radhe/packs"
+for pack in math cs science; do
+  curl -fsSL "https://raw.githubusercontent.com/DevWizard-Vandan/radhe-ai/main/packs/$pack.md" \
+    -o "$HOME/.radhe/packs/$pack.md"
+  echo "  Downloaded $pack.md"
+done
+echo "Starter packs installed to ~/.radhe/packs/"
+
 echo ""
-echo "Radhe AI v0.5.0 installed successfully!"
+echo "Radhe AI v0.6.0 installed successfully!"
 echo "Restart your terminal, then try:"
 echo "  radhe --explain \"binary search\""
 echo "  radhe --summarize notes.txt"

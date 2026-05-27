@@ -43,6 +43,20 @@ radhe --chat
 radhe update
 ```
 
+## Subject Packs
+Radhe ships with 3 starter packs that tune its responses for specific subjects:
+| Pack | Command | Coverage |
+|------|---------|----------|
+| Math | `radhe --pack math` | Algebra, Calculus, Stats, Trig |
+| Computer Science | `radhe --pack cs` | DSA, OS, DBMS, Networking |
+| Science | `radhe --pack science` | Physics, Chemistry, Biology |
+
+List installed packs:
+```bash
+radhe --list-packs
+```
+Install a custom pack by dropping any `.md` file into `~/.radhe/packs/`.
+
 ## Requirements
 - Windows 10/11
 - ~1.5GB free disk space (for model)
