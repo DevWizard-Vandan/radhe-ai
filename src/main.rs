@@ -8,6 +8,12 @@ use std::{
     process::{Command, Stdio},
 };
 
+fn debug_log(msg: &str) {
+    if std::env::var("RADHE_DEBUG").unwrap_or_default() == "1" {
+        eprintln!("[DEBUG] {}", msg);
+    }
+}
+
 #[derive(Deserialize, Default, Debug)]
 struct RadheConfig {
     model: Option<String>,
@@ -111,7 +117,9 @@ max_tokens = 300
     if let Some(ref path) = cli.summarize {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
-        cli.summarize = Some(abs_path.to_string_lossy().into_owned());
+        let resolved = abs_path.to_string_lossy().into_owned();
+        debug_log(&format!("Resolved path: {}", resolved));
+        cli.summarize = Some(resolved);
     }
 
     if let Some(ref path) = cli.fix {
@@ -123,7 +131,9 @@ max_tokens = 300
     if let Some(ref path) = cli.quiz_file {
         let abs_path = std::fs::canonicalize(path)
             .unwrap_or_else(|_| std::path::PathBuf::from(path));
-        cli.quiz_file = Some(abs_path.to_string_lossy().into_owned());
+        let resolved = abs_path.to_string_lossy().into_owned();
+        debug_log(&format!("Resolved path: {}", resolved));
+        cli.quiz_file = Some(resolved);
     }
 
     // Keep 0.5B accessible via --model qwen-0.5b override flag
@@ -135,6 +145,8 @@ max_tokens = 300
     let active_max_tokens = cli.max_tokens
         .or(config.max_tokens)
         .unwrap_or(300);
+
+    debug_log(&format!("Config loaded — model: {}, max_tokens: {}", active_model, active_max_tokens));
 
     match cli.command {
         Some(Commands::Init) => {
@@ -451,6 +463,8 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         .join(&model_filename);
     let model_path = model_path.to_string_lossy().into_owned();
 
+    debug_log(&format!("Prompt ({} chars): {}", prompt.len(), &prompt[..prompt.len().min(200)]));
+
     let prompt_with_delim = if mode == "fix" || mode == "chat" {
         prompt.to_string()
     } else {
@@ -495,6 +509,8 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
     }
 
     let target_str = if stdout_str.trim().is_empty() { &stderr_str } else { &stdout_str };
+    
+    debug_log(&format!("Raw output ({} chars)", target_str.len()));
     
     // Filter out log/perf lines starting with "0."
     let cleaned_lines: Vec<&str> = target_str
@@ -1049,6 +1065,8 @@ fn run_update() -> Result<()> {
     if latest_version.starts_with('v') {
         latest_version = latest_version[1..].to_string();
     }
+
+    debug_log(&format!("Latest version from API: {}", latest_version));
 
     if latest_version.is_empty() {
         anyhow::bail!("Update check failed. Are you connected to the internet?");
