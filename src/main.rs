@@ -16,10 +16,13 @@ struct RadheConfig {
 
 #[derive(Parser, Debug)]
 #[command(name = "radhe")]
-#[command(version, about = "Tiny offline terminal AI assistant for students")]
+#[command(about = "Tiny offline terminal AI assistant for students")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    #[arg(long)]
+    version: bool,
 
     #[arg(value_name = "PROMPT")]
     prompt: Option<String>,
@@ -93,6 +96,17 @@ max_tokens = 300
     };
 
     let mut cli = Cli::parse();
+
+    if cli.version {
+        let version = env!("CARGO_PKG_VERSION");
+        let model = cli.model
+            .clone()
+            .or_else(|| config.model.clone())
+            .unwrap_or_else(|| "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf".to_string());
+        println!("Radhe AI v{}", version);
+        println!("Model: {}", model);
+        std::process::exit(0);
+    }
 
     if let Some(ref path) = cli.summarize {
         let abs_path = std::fs::canonicalize(path)
