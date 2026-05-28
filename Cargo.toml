@@ -1,6 +1,6 @@
 [package]
 name = "radhe-ai"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Vandan Sharma"]
 description = "A tiny offline terminal AI assistant for students"
