@@ -9,8 +9,17 @@ mkdir -p "$BIN_DIR" "$MODELS_DIR"
 # 2. Download radhe binary (Linux)
 RADHE_URL="https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/radhe"
 echo "Downloading radhe binary..."
-curl -L "$RADHE_URL" -o "$BIN_DIR/radhe"
+curl -fL "$RADHE_URL" -o "$BIN_DIR/radhe"
 chmod +x "$BIN_DIR/radhe"
+
+# Verify that the downloaded file is a valid ELF binary
+if ! file "$BIN_DIR/radhe" | grep -q "ELF"; then
+  echo "Error: Failed to download a valid radhe binary."
+  echo "The release asset may be missing. Check:"
+  echo "  https://github.com/DevWizard-Vandan/radhe-ai/releases"
+  rm -f "$BIN_DIR/radhe"
+  exit 1
+fi
 # 3. Download latest llama.cpp Linux CPU build
 echo "Fetching latest llama.cpp release..."
 LLAMA_RELEASE=$(curl -s https://api.github.com/repos/ggml-org/llama.cpp/releases/latest)
