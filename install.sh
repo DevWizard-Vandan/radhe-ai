@@ -21,11 +21,12 @@ if [ -z "$LLAMA_URL" ]; then
   exit 1
 fi
 echo "Downloading llama.cpp: $LLAMA_URL"
-curl -L "$LLAMA_URL" -o /tmp/llama.zip
-unzip -o /tmp/llama.zip -d /tmp/llama_extract
+curl -L "$LLAMA_URL" -o /tmp/llama.tar.gz
+mkdir -p /tmp/llama_extract
+tar -xzf /tmp/llama.tar.gz -C /tmp/llama_extract
 find /tmp/llama_extract -name "llama-cli" -o -name "llama-completion" | xargs -I{} cp {} "$BIN_DIR/" 2>/dev/null || true
 find /tmp/llama_extract -name "*.so" | xargs -I{} cp {} "$BIN_DIR/" 2>/dev/null || true
-rm -rf /tmp/llama.zip /tmp/llama_extract
+rm -rf /tmp/llama.tar.gz /tmp/llama_extract
 # 4. Download Qwen2.5-Coder 1.5B model
 MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
 MODEL_DEST="$MODELS_DIR/Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
