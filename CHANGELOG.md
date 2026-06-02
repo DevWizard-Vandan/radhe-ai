@@ -1,4 +1,13 @@
 # Changelog
+## [v0.7.1] — 2026-06-02
+- feat: study modes (`--mode normal|exam|revision`) with `--set-mode` config persistence
+- feat: quiz difficulty (`--difficulty easy|medium|hard`) with `--set-difficulty` config persistence
+- feat: local analytics subcommand (`radhe stats`) tracking usage in `stats.toml`
+- feat: stats reset command (`radhe stats --reset`) with confirmation prompt
+- feat: pack deletion subcommand (`--delete-pack <name>`) with confirmation prompt
+- fix: dynamic runtime OS binary check and cross-platform self-update pipeline
+- fix: wired active language support into interactive REPL session mode
+
 ## [v0.7.0] — 2026-05-27
 - feat: `--lang hi|hinglish` — response language mode (Hindi, Hinglish, English)
 - feat: `--set-lang <lang>` — persist default language in `config.toml`

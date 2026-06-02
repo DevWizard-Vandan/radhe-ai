@@ -6,56 +6,42 @@ This document highlights the current developmental health, active milestones, an
 
 ## Active Release Status
 
-* **Current Stable Version**: `v0.5.0` (Persistent chat, quiz file generation, models, update, and summarize subcommands)
-* **Status**: :white_check_mark: Active development / v0.5.0 successfully launched.
+* **Current Stable Version**: `v0.7.1` (Local Analytics, Study Modes, Quiz Difficulty, Config Persistence, and Pack Deletion)
+* **Status**: :white_check_mark: Active development / v0.7.1 successfully launched.
 
 ---
 
 ## Milestones Dashboard
 
-### :checkered_flag: Milestone 0.4.0: Persistent Chat & Quiz From File (Completed)
+### :checkered_flag: Milestone 0.7.1: Local Analytics & Student Experience (Completed)
+* [x] **Study Modes (`--mode`)**: `exam` (ultra-short, direct, zero-fluff answers), `revision` (bullet-style memory aids), and `normal` (detailed conceptual explanations).
+* [x] **Quiz Difficulty (`--difficulty`)**: Adapt MCQ and Q&A quiz generation dynamically to `easy`, `medium`, and `hard` settings.
+* [x] **Local Analytics (`radhe stats`)**: Track `total_commands`, features, and alphabetical pack usage counters locally inside `stats.toml` preserving complete user privacy.
+* [x] **Stats Reset (`--reset`)**: Add secure statistical data wipe after interactive `[y/N]` confirmation.
+* [x] **Pack Deletion (`--delete-pack`)**: Implement interactive custom subject pack deletion from `~/.radhe/packs/`.
+* [x] **Config Persistence (`--set-mode`/`--set-difficulty`)**: Allow users to save their preferred study modes and quiz difficulty defaults permanently to `config.toml`.
+* [x] **Dynamic OS Binary Resolution**: Automatic runtime binary check (`llama-completion` vs `llama-completion.exe`) preventing platform crash errors.
+
+### :checkered_flag: Milestone 0.7.0: Multilingual Hindi & Hinglish Support (Completed)
+* [x] **Response Language Mode (`--lang hi|hinglish`)**: Multilingual output support using English, Devanagari script Hindi, or student-friendly casual Hinglish in Roman script.
+* [x] **Language Defaults Persistence (`--set-lang`)**: Save language preference defaults permanently in `~/.radhe/config.toml`.
+* [x] **Diagnostics Language Check**: Display active language selection in `radhe doctor` checks.
+
+### :checkered_flag: Milestone 0.6.0: Subject Packs & Custom Pack Wizard (Completed)
+* [x] **Subject Packs (`--pack <name>`)**: Tune Radhe's local model responses with customized starter subject packages (`math`, `cs`, `science`).
+* [x] **Pack List (`--list-packs`)**: Scan local packs directories and display all installed packages in the terminal.
+* [x] **Pack Creator Wizard (`--create-pack`)**: Interactive custom subject pack creator collecting topics, formulas, facts, and quiz styling.
+
+### :checkered_flag: Milestone 0.5.0: Persistent Chat & Quiz From File (Completed)
 * [x] **Persistent chat mode via `--chat`**: 6-turn rolling context window to preserve interactive dialogue history.
-* [x] **ChatML prompt format for Qwen instruct models**: Native support for delimiters (`<|im_start|>`/`<|im_end|>`) matching Qwen instruct models.
-* [x] **Fixed context history passing across turns**: Robust prompt stripping preventing conversation turn boundary hallucination.
-* [x] **`--quiz-file`**: Generate quiz questions from student notes files.
-* [x] **`--version` flag**: Prints version + active model instantly.
-* [x] **Enhanced doctor**: Version header, active model validation, colored output.
-
-### :checkered_flag: Milestone 0.3.0: File Summarization & Self-Updates (Completed)
-* [x] **File Summarization (`--summarize`)**: Truncates inputs to 3000 characters and generates structured 5-bullet summary notes.
-* [x] **Self-Update Engine (`radhe update`)**: PowerShell-based live connection check, secure credential retrieval, and automatic Windows executable swapping.
-* [x] **Default Model Upgrade**: Lifted default offline LLM model from `0.5B` to the advanced `Qwen2.5-Coder 1.5B`.
-* [x] **Interactive CS Quiz Engine (`--quiz` / `--count`)**: Formulates custom computer science student exams and evaluates student input case-insensitively.
-* [x] **Configuration System (`config.toml`)**: Auto-generates configuration file `~/.radhe/config.toml` on startup and parses preferences.
-* [x] **CLI Flag Overrides**: Priority resolution: CLI `--model` / `--max-tokens` > `config.toml` > defaults.
-* [x] **Model Subcommand (`radhe models`)**: Auto-scans directory size, outputs MB, and highlights active `.gguf` file.
-
-### :checkered_flag: Milestone 0.1.0: Core Offline Engine (Completed)
-* [x] **Lightweight Rust CLI Harness**: Built with `clap` and optimized release settings.
-* [x] **Subprocess local runner**: Connects to `llama-completion.exe` with precise temperature thresholds.
-* [x] **Specialized Prompts**:
-  - `--code`: Generates compilable code blocks with prompt boundaries.
-  - `--explain`: Short 5-bullet conceptual definitions.
-  - `--notes`: Quick 6-bullet academic revision notes.
-* [x] **Compiler & Debugger `--fix` Mode**: Uses case-insensitive extensions to mimic specific compilers, and strips comment templates.
-* [x] **Interactive REPL Mode**: Colored welcome headers, green prompt, standard commands (`/exit`, `/clear`), and `Ctrl+C` interrupt handlers.
-* [x] **Environment Diagnostics**: `doctor` mode checks paths and validates local model downloads.
-
-### :checkered_flag: Milestone 0.2.0: The Student Installer (Completed)
-* [x] **Automated PowerShell installer (`install.ps1`)**: Downloads `radhe.exe`, `llama.cpp`, advanced Qwen 1.5B model, updates PATH.
-* [x] **Pre-compiled binary bundles**: pre-compiled packages released via GitHub Releases (Windows + Linux).
-* [x] **Unified `~/.radhe` directory structure**: Establishes automatic setup and scanner bounds in `~/.radhe`.
-* [ ] **Automated Shell Installer (`install.sh`)**: Create `install.sh` for Linux/macOS compatibility.
-
-### :bulb: Milestone 0.5.0: Hindi Support & Editor Integrations (Planned)
-* [ ] **Multilingual Prompt Templates**: Add Hindi-English (Hinglish) support for explanation and student notes modes.
-* [ ] **VS Code Extension**: Lightweight extension to invoke the local model using keyboard shortcut bindings.
-* [ ] **Vim/Neovim Plugin**: Simple Lua script to pipe marked visual blocks straight through `radhe --fix`.
+* [x] **`--quiz-file`**: Generate student quiz questions directly from text notes files.
+* [x] **`--version` flag**: Print version and active GGUF model information instantly.
+* [x] **Enhanced doctor**: Prints platform diagnostics, active model verification, and colored output indicators.
 
 ---
 
 ## Technical Health Metrics
 
-* **Code Coverage**: Cargo integration testing planned for `v0.1.5`.
+* **Code Coverage**: Cargo unit and integration testing covers prompt compilations, CLI parsing, and file checking.
 * **Binary Size**: Optimized at `< 1.5MB` via compilation profiling (`lto = true`, `strip = true`).
-* **Memory Usage**: Under `20MB` runtime footprint (excluding the quantized GGUF model memory in the `llama` backend).
+* **Memory Usage**: Under `20MB` runtime footprint (excluding the GGUF model weights in the inference backend).
