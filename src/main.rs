@@ -209,6 +209,12 @@ struct RadheConfig {
     lang: Option<String>,
     mode: Option<String>,
     difficulty: Option<String>,
+    profile: Option<String>,
+    stats_enabled: Option<bool>,
+    packs_enabled: Option<bool>,
+    shell_enabled: Option<bool>,
+    modes_enabled: Option<bool>,
+    difficulty_enabled: Option<bool>,
 }
 
 #[derive(Parser, Debug)]
@@ -535,9 +541,15 @@ max_tokens = 300
         std::process::exit(1);
     }
 
+    let active_profile = config.profile.clone().unwrap_or_else(|| "standard".to_string());
+
     debug_log(&format!("Config loaded — model: {}, max_tokens: {}, lang: {}, mode: {}, difficulty: {}", active_model, active_max_tokens, active_lang, active_mode, active_difficulty));
 
     if let Some(ref pack_name) = cli.pack {
+        if config.packs_enabled == Some(false) {
+            println!("Packs are disabled. Run 'radhe setup' to enable them.");
+            std::process::exit(0);
+        }
         let pack_path = find_pack(pack_name);
         if pack_path.is_none() {
             eprintln!("{}: Pack file '{}.md' not found.", "Error".red(), pack_name);
@@ -607,10 +619,14 @@ max_tokens = 300
             return Ok(());
         }
         Some(Commands::Doctor) => {
-            run_doctor(&active_model, &active_lang, &active_mode, &active_difficulty);
+            run_doctor(&active_model, &active_lang, &active_mode, &active_difficulty, &active_profile);
             return Ok(());
         }
         Some(Commands::Shell) => {
+            if config.shell_enabled == Some(false) {
+                println!("Shell is disabled. Run 'radhe setup' to enable it.");
+                std::process::exit(0);
+            }
             run_power_shell(&active_model, &active_lang, &active_difficulty, &active_mode)?;
             return Ok(());
         }
@@ -678,7 +694,7 @@ max_tokens = 300
         && !cli.chat;
 
     if is_repl {
-        run_repl(&active_model, &active_lang, &active_difficulty, &active_mode)?;
+        run_repl(&active_model, &active_lang, &active_difficulty, &active_mode, &active_profile)?;
         return Ok(());
     }
 
@@ -1285,12 +1301,13 @@ fn init_dirs() -> Result<()> {
     Ok(())
 }
 
-fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_difficulty: &str) {
+fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_difficulty: &str, profile: &str) {
     use colored::Colorize;
 
     let version = env!("CARGO_PKG_VERSION");
     println!("Radhe AI v{}", version);
     println!("Running diagnostics...");
+    println!("{}", format!("✓ Profile: {}", profile).green());
 
     let mut all_ok = true;
 
@@ -1367,7 +1384,7 @@ fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_d
     }
 }
 
-fn run_repl(model: &str, lang: &str, difficulty: &str, study_mode: &str) -> Result<()> {
+fn run_repl(model: &str, lang: &str, difficulty: &str, study_mode: &str, profile: &str) -> Result<()> {
     use colored::Colorize;
     use std::io::{self, BufRead, Write};
 
@@ -1388,6 +1405,7 @@ fn run_repl(model: &str, lang: &str, difficulty: &str, study_mode: &str) -> Resu
     println!("{}", "╔══════════════════════════════════════════╗".cyan());
     println!("{}", format!("║        Radhe AI v{} — Offline AI      ║", version).cyan());
     println!("{}", "╚══════════════════════════════════════════╝".cyan());
+    println!(" {} : {}", "Profile".green(), profile);
     println!(" {}   : {}", "Model".green(), model);
     println!(" {}    : {}   {}", "Mode".green(), study_mode, "(change: --set-mode exam)".yellow());
     println!(" {}: {}  {}", "Difficulty".green(), difficulty, "(change: --set-difficulty hard)".yellow());
@@ -2251,6 +2269,18 @@ struct RadheStats {
 }
 
 fn load_stats(path: &std::path::Path) -> RadheStats {
+    if let Some(home) = dirs::home_dir() {
+        let config_path = home.join(".radhe").join("config.toml");
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(cfg) = toml::from_str::<RadheConfig>(&content) {
+                    if cfg.stats_enabled == Some(false) {
+                        return RadheStats::default();
+                    }
+                }
+            }
+        }
+    }
     if path.exists() {
         let content = fs::read_to_string(path).unwrap_or_default();
         toml::from_str(&content).unwrap_or_default()
@@ -2260,6 +2290,18 @@ fn load_stats(path: &std::path::Path) -> RadheStats {
 }
 
 fn save_stats(path: &std::path::Path, stats: &RadheStats) -> Result<()> {
+    if let Some(home) = dirs::home_dir() {
+        let config_path = home.join(".radhe").join("config.toml");
+        if config_path.exists() {
+            if let Ok(content) = fs::read_to_string(&config_path) {
+                if let Ok(cfg) = toml::from_str::<RadheConfig>(&content) {
+                    if cfg.stats_enabled == Some(false) {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
     let content = toml::to_string(stats)?;
     fs::write(path, content)?;
     Ok(())
@@ -2269,56 +2311,173 @@ fn run_setup(config_path: &std::path::Path, current_mode: &str, current_difficul
     use std::io::{self, Write};
     use colored::Colorize;
 
-    println!("{}", "Radhe AI Interactive Configuration Setup".cyan().bold());
-    println!();
+    // Show profile picker
+    println!("{}", "╔══════════════════════════════════════════╗".cyan());
+    println!("{}", "║        Radhe AI — First-Run Setup        ║".cyan());
+    println!("{}", "╚══════════════════════════════════════════╝".cyan());
+    println!("Choose your setup profile:");
+    println!("  1) {}  — Just ask questions, get answers.", "Minimal".yellow());
+    println!("                No stats, no shell, no packs. Fastest.");
+    println!("  2) {} — Recommended. Stats tracking, radhe shell,", "Standard".yellow());
+    println!("                study modes, difficulty. Everything useful.");
+    println!("  3) {}   — Choose exactly which features to enable.", "Custom".yellow());
 
-    // 1. Study Mode Selector
-    println!("{}", "┌─ Study Mode ────────────────────────────┐".cyan());
-    println!("│  1) {}   — full explanations        │", "normal".yellow());
-    println!("│  2) {}     — short, direct answers    │", "exam".yellow());
-    println!("│  3) {} — bullet memory aids       │", "revision".yellow());
-    println!("{}", "└─────────────────────────────────────────┘".cyan());
-
-    let mut selected_mode = current_mode.to_string();
+    let profile_choice;
     loop {
-        print!("Select mode [1-3] (current: {}): ", current_mode);
+        print!("Select profile [1-3]: ");
         io::stdout().flush().context("failed to flush stdout")?;
         let mut input = String::new();
-        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            break;
+        let bytes_read = io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        if bytes_read == 0 {
+            println!("Setup aborted (EOF).");
+            return Ok(());
         }
-        match trimmed {
-            "1" => { selected_mode = "normal".to_string(); break; }
-            "2" => { selected_mode = "exam".to_string(); break; }
-            "3" => { selected_mode = "revision".to_string(); break; }
-            _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+        let trimmed = input.trim();
+        if trimmed == "1" || trimmed == "2" || trimmed == "3" {
+            profile_choice = trimmed.to_string();
+            break;
+        } else {
+            println!("Invalid selection. Please choose 1, 2, or 3.");
         }
     }
 
-    // 2. Quiz Difficulty Selector
-    println!("{}", "┌─ Quiz Difficulty ───────────────────────┐".cyan());
-    println!("│  1) {}    — basic recall              │", "easy".yellow());
-    println!("│  2) {}  — conceptual understanding  │", "medium".yellow());
-    println!("│  3) {}    — critical thinking         │", "hard".yellow());
-    println!("{}", "└─────────────────────────────────────────┘".cyan());
+    // Load existing config
+    let content = if config_path.exists() {
+        std::fs::read_to_string(config_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut config: RadheConfig = toml::from_str(&content).unwrap_or_default();
+
+    if profile_choice == "1" {
+        // Profile 1 — Minimal
+        config.model = Some(config.model.clone().unwrap_or_else(|| "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf".to_string()));
+        config.max_tokens = Some(config.max_tokens.unwrap_or(300));
+        config.lang = Some("en".to_string());
+        config.mode = Some("normal".to_string());
+        config.difficulty = Some("medium".to_string());
+        config.profile = Some("minimal".to_string());
+        config.stats_enabled = Some(false);
+        config.packs_enabled = Some(false);
+        config.shell_enabled = Some(false);
+        config.modes_enabled = Some(false);
+        config.difficulty_enabled = Some(false);
+
+        let updated_content = toml::to_string(&config)?;
+        std::fs::write(config_path, updated_content)?;
+
+        println!("{}", "✓ Minimal profile set. Run: radhe \"your question\"".green());
+        return Ok(());
+    }
+
+    let modes_enabled;
+    let difficulty_enabled;
+
+    if profile_choice == "2" {
+        modes_enabled = true;
+        difficulty_enabled = true;
+
+        config.profile = Some("standard".to_string());
+        config.stats_enabled = Some(true);
+        config.packs_enabled = Some(true);
+        config.shell_enabled = Some(true);
+        config.modes_enabled = Some(true);
+        config.difficulty_enabled = Some(true);
+    } else {
+        // Profile 3 — Custom
+        let ask_feature = |prompt: &str| -> bool {
+            loop {
+                print!("{} [Y/n]: ", prompt);
+                io::stdout().flush().ok();
+                let mut input = String::new();
+                match io::stdin().read_line(&mut input) {
+                    Err(_) => return true,
+                    Ok(0) => return true,
+                    Ok(_) => {}
+                }
+                let trimmed = input.trim().to_lowercase();
+                if trimmed.is_empty() || trimmed == "y" || trimmed == "yes" {
+                    return true;
+                } else if trimmed == "n" || trimmed == "no" {
+                    return false;
+                } else {
+                    println!("Invalid input. Enter Y/y or N/n, or just press Enter.");
+                }
+            }
+        };
+
+        let stats_val = ask_feature("Enable usage stats (radhe stats)?");
+        let packs_val = ask_feature("Enable subject packs (radhe --pack)?");
+        let shell_val = ask_feature("Enable power shell (radhe shell)?");
+        modes_enabled = ask_feature("Enable study modes (--mode exam/revision)?");
+        difficulty_enabled = ask_feature("Enable quiz difficulty (--difficulty hard)?");
+
+        config.profile = Some("custom".to_string());
+        config.stats_enabled = Some(stats_val);
+        config.packs_enabled = Some(packs_val);
+        config.shell_enabled = Some(shell_val);
+        config.modes_enabled = Some(modes_enabled);
+        config.difficulty_enabled = Some(difficulty_enabled);
+    }
+
+    // Now run the mode/difficulty/language menus only for features that were enabled.
+    let mut selected_mode = current_mode.to_string();
+    if modes_enabled {
+        // 1. Study Mode Selector
+        println!("{}", "┌─ Study Mode ────────────────────────────┐".cyan());
+        println!("│  1) {}   — full explanations        │", "normal".yellow());
+        println!("│  2) {}     — short, direct answers    │", "exam".yellow());
+        println!("│  3) {} — bullet memory aids       │", "revision".yellow());
+        println!("{}", "└─────────────────────────────────────────┘".cyan());
+
+        loop {
+            print!("Select mode [1-3] (current: {}): ", current_mode);
+            io::stdout().flush().context("failed to flush stdout")?;
+            let mut input = String::new();
+            let bytes_read = io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+            if bytes_read == 0 {
+                break;
+            }
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                break;
+            }
+            match trimmed {
+                "1" => { selected_mode = "normal".to_string(); break; }
+                "2" => { selected_mode = "exam".to_string(); break; }
+                "3" => { selected_mode = "revision".to_string(); break; }
+                _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+            }
+        }
+    }
 
     let mut selected_diff = current_difficulty.to_string();
-    loop {
-        print!("Select difficulty [1-3] (current: {}): ", current_difficulty);
-        io::stdout().flush().context("failed to flush stdout")?;
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            break;
-        }
-        match trimmed {
-            "1" => { selected_diff = "easy".to_string(); break; }
-            "2" => { selected_diff = "medium".to_string(); break; }
-            "3" => { selected_diff = "hard".to_string(); break; }
-            _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+    if difficulty_enabled {
+        // 2. Quiz Difficulty Selector
+        println!("{}", "┌─ Quiz Difficulty ───────────────────────┐".cyan());
+        println!("│  1) {}    — basic recall              │", "easy".yellow());
+        println!("│  2) {}  — conceptual understanding  │", "medium".yellow());
+        println!("│  3) {}    — critical thinking         │", "hard".yellow());
+        println!("{}", "└─────────────────────────────────────────┘".cyan());
+
+        loop {
+            print!("Select difficulty [1-3] (current: {}): ", current_difficulty);
+            io::stdout().flush().context("failed to flush stdout")?;
+            let mut input = String::new();
+            let bytes_read = io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+            if bytes_read == 0 {
+                break;
+            }
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                break;
+            }
+            match trimmed {
+                "1" => { selected_diff = "easy".to_string(); break; }
+                "2" => { selected_diff = "medium".to_string(); break; }
+                "3" => { selected_diff = "hard".to_string(); break; }
+                _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+            }
         }
     }
 
@@ -2334,7 +2493,10 @@ fn run_setup(config_path: &std::path::Path, current_mode: &str, current_difficul
         print!("Select language [1-3] (current: {}): ", current_lang);
         io::stdout().flush().context("failed to flush stdout")?;
         let mut input = String::new();
-        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        let bytes_read = io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        if bytes_read == 0 {
+            break;
+        }
         let trimmed = input.trim();
         if trimmed.is_empty() {
             break;
@@ -2347,13 +2509,6 @@ fn run_setup(config_path: &std::path::Path, current_mode: &str, current_difficul
         }
     }
 
-    let content = if config_path.exists() {
-        std::fs::read_to_string(config_path).unwrap_or_default()
-    } else {
-        String::new()
-    };
-    let mut config: RadheConfig = toml::from_str(&content).unwrap_or_default();
-    
     config.mode = Some(selected_mode);
     config.difficulty = Some(selected_diff);
     config.lang = Some(selected_lang);
@@ -2361,7 +2516,11 @@ fn run_setup(config_path: &std::path::Path, current_mode: &str, current_difficul
     let updated_content = toml::to_string(&config)?;
     std::fs::write(config_path, updated_content)?;
 
-    println!("{}", format!("✓ Config saved to {}", config_path.display()).green());
+    if profile_choice == "2" {
+        println!("{}", "✓ Standard profile active. All features enabled.".green());
+    } else {
+        println!("{}", "✓ Custom profile active.".green());
+    }
     Ok(())
 }
 

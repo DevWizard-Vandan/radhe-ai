@@ -151,3 +151,66 @@ fn test_doctor_shows_shell() {
     assert!(stdout.contains("Shell"), "doctor should print 'Shell'");
     assert!(output.status.success());
 }
+
+#[test]
+fn test_setup_minimal_piped() {
+    use std::io::Write;
+    let mut child = radhe()
+        .arg("setup")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("failed to spawn radhe");
+
+    let mut stdin = child.stdin.take().expect("failed to open stdin");
+    stdin.write_all(b"1\n").expect("failed to write to stdin");
+    drop(stdin);
+
+    let output = child.wait_with_output().expect("failed to read output");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Minimal profile set"), "should print minimal profile set");
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_setup_standard_piped_eof() {
+    use std::io::Write;
+    let mut child = radhe()
+        .arg("setup")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("failed to spawn radhe");
+
+    let mut stdin = child.stdin.take().expect("failed to open stdin");
+    stdin.write_all(b"2\n").expect("failed to write to stdin");
+    drop(stdin);
+
+    let output = child.wait_with_output().expect("failed to read output");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Standard profile active"), "should print standard profile active");
+    assert!(output.status.success());
+}
+
+#[test]
+fn test_setup_custom_piped_eof() {
+    use std::io::Write;
+    let mut child = radhe()
+        .arg("setup")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("failed to spawn radhe");
+
+    let mut stdin = child.stdin.take().expect("failed to open stdin");
+    stdin.write_all(b"3\n").expect("failed to write to stdin");
+    drop(stdin);
+
+    let output = child.wait_with_output().expect("failed to read output");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Custom profile active") || stdout.contains("Enable usage stats"), "should handle custom profile inputs");
+    assert!(output.status.success());
+}
