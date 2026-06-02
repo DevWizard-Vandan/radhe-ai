@@ -14,6 +14,10 @@
 | `radhe --chat` | Start a persistent conversation |
 | `radhe --lang hi` | Response in Hindi (also: `hinglish`) |
 | `radhe --set-lang hinglish` | Set default language permanently |
+| `radhe --mode <mode>` | Set study mode (`normal`, `exam`, `revision`) |
+| `radhe --difficulty <diff>` | Set quiz difficulty (`easy`, `medium`, `hard`) |
+| `radhe --set-mode <mode>` | Save default study mode permanently |
+| `radhe --set-difficulty <diff>` | Save default quiz difficulty permanently |
 | `radhe update` | Self-update to the latest version |
 | `radhe models` | List installed models |
 | `radhe doctor` | Check installation health |
@@ -83,6 +87,46 @@ Or use it per-command:
 ```bash
 radhe --explain "binary search" --lang hi
 radhe --chat --lang hinglish
+```
+
+## Study Modes & Quiz Difficulty 🎯
+
+### Study Modes (`--mode`)
+Tailor Radhe's explanation style to your study goal:
+- **`normal`** (Default): In-depth conceptual explanations.
+- **`exam`**: Ultra-short, direct, zero-fluff definitions and answers (max 2-3 sentences).
+- **`revision`**: Bullet-style concise memory aids and quick revision facts.
+
+```bash
+# Get quick exam-style explanation
+radhe --explain "polymorphism" --mode exam
+
+# Generate revision notes
+radhe --notes "quick sort" --mode revision
+```
+
+Set your default study mode permanently:
+```bash
+radhe --set-mode exam
+```
+
+### Quiz Difficulty (`--difficulty`)
+Control the difficulty of generated interactive quizzes:
+- **`easy`**: Factual recall and basic concepts.
+- **`medium`** (Default): Intermediate conceptual understanding.
+- **`hard`**: Advanced analytical questions, edge cases, and plausible distractors.
+
+```bash
+# Generate a hard MCQ quiz
+radhe --quiz "recursion" --difficulty hard
+
+# Generate an easy Q&A quiz from lecture notes
+radhe --quiz-file notes.txt --difficulty easy
+```
+
+Set your default quiz difficulty permanently:
+```bash
+radhe --set-difficulty hard
 ```
 
 ## Requirements

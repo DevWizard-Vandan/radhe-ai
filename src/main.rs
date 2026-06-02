@@ -208,6 +208,8 @@ struct RadheConfig {
     model: Option<String>,
     max_tokens: Option<u32>,
     lang: Option<String>,
+    mode: Option<String>,
+    difficulty: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -277,6 +279,22 @@ struct Cli {
     /// Set default language in config: 'en', 'hi', or 'hinglish'
     #[arg(long = "set-lang", value_name = "LANG")]
     set_lang: Option<String>,
+
+    /// Study mode: 'normal' (default), 'exam' (shorter, direct, no fluff), 'revision' (bullet-style concise memory aids)
+    #[arg(long = "mode", value_name = "MODE")]
+    mode: Option<String>,
+
+    /// Quiz difficulty: 'easy', 'medium' (default), 'hard'
+    #[arg(long = "difficulty", value_name = "DIFFICULTY")]
+    difficulty: Option<String>,
+
+    /// Set default study mode in config: 'normal', 'exam', or 'revision'
+    #[arg(long = "set-mode", value_name = "MODE")]
+    set_mode: Option<String>,
+
+    /// Set default quiz difficulty in config: 'easy', 'medium', or 'hard'
+    #[arg(long = "set-difficulty", value_name = "DIFFICULTY")]
+    set_difficulty: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -358,6 +376,60 @@ max_tokens = 300
         std::process::exit(0);
     }
 
+    // Handle --set-mode early
+    if let Some(ref new_mode) = cli.set_mode {
+        let valid = ["normal", "exam", "revision"];
+        if !valid.contains(&new_mode.as_str()) {
+            eprintln!("{}: Invalid study mode '{}'. Valid options: normal, exam, revision", "Error".red(), new_mode);
+            eprintln!("{}: Use --set-mode normal, --set-mode exam, or --set-mode revision", "Hint".yellow());
+            std::process::exit(1);
+        }
+        // Read existing config and update mode line
+        let content = fs::read_to_string(&config_path).unwrap_or_default();
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        let mut found_mode = false;
+        for line in lines.iter_mut() {
+            if line.starts_with("mode") && line.contains('=') {
+                *line = format!("mode = \"{}\"", new_mode);
+                found_mode = true;
+                break;
+            }
+        }
+        if !found_mode {
+            lines.push(format!("mode = \"{}\"", new_mode));
+        }
+        fs::write(&config_path, lines.join("\n") + "\n")?;
+        println!("Default study mode set to '{}'. All future responses will use this mode.", new_mode);
+        std::process::exit(0);
+    }
+
+    // Handle --set-difficulty early
+    if let Some(ref new_diff) = cli.set_difficulty {
+        let valid = ["easy", "medium", "hard"];
+        if !valid.contains(&new_diff.as_str()) {
+            eprintln!("{}: Invalid quiz difficulty '{}'. Valid options: easy, medium, hard", "Error".red(), new_diff);
+            eprintln!("{}: Use --set-difficulty easy, --set-difficulty medium, or --set-difficulty hard", "Hint".yellow());
+            std::process::exit(1);
+        }
+        // Read existing config and update difficulty line
+        let content = fs::read_to_string(&config_path).unwrap_or_default();
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        let mut found_diff = false;
+        for line in lines.iter_mut() {
+            if line.starts_with("difficulty") && line.contains('=') {
+                *line = format!("difficulty = \"{}\"", new_diff);
+                found_diff = true;
+                break;
+            }
+        }
+        if !found_diff {
+            lines.push(format!("difficulty = \"{}\"", new_diff));
+        }
+        fs::write(&config_path, lines.join("\n") + "\n")?;
+        println!("Default quiz difficulty set to '{}'. All future quizzes will use this difficulty.", new_diff);
+        std::process::exit(0);
+    }
+
     if cli.list_packs {
         run_list_packs()?;
         std::process::exit(0);
@@ -436,7 +508,29 @@ max_tokens = 300
         .or_else(|| config.lang.clone())
         .unwrap_or_else(|| "en".to_string());
 
-    debug_log(&format!("Config loaded — model: {}, max_tokens: {}, lang: {}", active_model, active_max_tokens, active_lang));
+    // Resolve study mode: CLI flag > config.toml > default "normal"
+    let active_mode = cli.mode
+        .clone()
+        .or_else(|| config.mode.clone())
+        .unwrap_or_else(|| "normal".to_string());
+
+    if !["normal", "exam", "revision"].contains(&active_mode.as_str()) {
+        eprintln!("{}: Invalid study mode '{}'. Valid options: normal, exam, revision", "Error".red(), active_mode);
+        std::process::exit(1);
+    }
+
+    // Resolve quiz difficulty: CLI flag > config.toml > default "medium"
+    let active_difficulty = cli.difficulty
+        .clone()
+        .or_else(|| config.difficulty.clone())
+        .unwrap_or_else(|| "medium".to_string());
+
+    if !["easy", "medium", "hard"].contains(&active_difficulty.as_str()) {
+        eprintln!("{}: Invalid quiz difficulty '{}'. Valid options: easy, medium, hard", "Error".red(), active_difficulty);
+        std::process::exit(1);
+    }
+
+    debug_log(&format!("Config loaded — model: {}, max_tokens: {}, lang: {}, mode: {}, difficulty: {}", active_model, active_max_tokens, active_lang, active_mode, active_difficulty));
 
     if let Some(ref pack_name) = cli.pack {
         let pack_path = find_pack(pack_name);
@@ -501,7 +595,7 @@ max_tokens = 300
             return Ok(());
         }
         Some(Commands::Doctor) => {
-            run_doctor(&active_model, &active_lang);
+            run_doctor(&active_model, &active_lang, &active_mode, &active_difficulty);
             return Ok(());
         }
         Some(Commands::Models) => {
@@ -526,7 +620,7 @@ max_tokens = 300
         && !cli.chat;
 
     if is_repl {
-        run_repl(&active_model, &active_lang)?;
+        run_repl(&active_model, &active_lang, &active_difficulty, &active_mode)?;
         return Ok(());
     }
 
@@ -551,11 +645,11 @@ max_tokens = 300
     };
 
     if mode == "chat" {
-        run_chat(&active_model, &active_lang)?;
+        run_chat(&active_model, &active_lang, &active_mode)?;
         return Ok(());
     }
 
-    let prompt = build_prompt(&cli, &active_lang)?;
+    let prompt = build_prompt(&cli, &active_lang, &active_difficulty, &active_mode)?;
     let max_tokens = match mode {
         "code" => 300,
         "explain" => 200,
@@ -600,7 +694,7 @@ max_tokens = 300
     Ok(())
 }
 
-fn build_prompt(cli: &Cli, lang: &str) -> Result<String> {
+fn build_prompt(cli: &Cli, lang: &str, difficulty: &str, study_mode: &str) -> Result<String> {
     let lang_suffix = if lang != "en" {
         format!("\n\n{}", lang_system_prompt(lang))
     } else {
@@ -652,22 +746,48 @@ Task: {task_str}", lang_suffix
     }
 
     if let Some(topic) = &cli.explain {
-        return Ok(format!(
-            "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.{}\n\nExplanation:", lang_suffix
-        ));
+        let prompt_body = match study_mode {
+            "exam" => format!("Explain '{topic}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences."),
+            "revision" => format!("Explain '{topic}' for a beginner programmer using bullet-style concise memory aids and quick revision facts. Keep them extremely short and punchy."),
+            _ => format!("Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself."),
+        };
+        return Ok(format!("{}{}\n\nExplanation:", prompt_body, lang_suffix));
     }
 
     if let Some(topic) = &cli.notes {
-        return Ok(format!(
-            "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+        let prompt_body = match study_mode {
+            "exam" => format!(
+                "Give exactly 6 bullet points about '{topic}' for a student. Focus strictly on exam-relevant facts, direct and with zero fluff. Format strictly as:
 - [fact 1]
 - [fact 2]
 - [fact 3]
 - [fact 4]
 - [fact 5]
 - [fact 6]
-Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{}", lang_suffix
-        ));
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
+            ),
+            "revision" => format!(
+                "Give exactly 6 bullet points about '{topic}' for a student. Use bullet-style concise memory aids and quick revision facts that are extremely punchy. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
+            ),
+            _ => format!(
+                "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
+            ),
+        };
+        return Ok(format!("{}{}", prompt_body, lang_suffix));
     }
 
     if let Some(file_path_str) = &cli.fix {
@@ -749,12 +869,18 @@ FIXED CODE:\n",
         }
         let truncated: String = trimmed_content.chars().take(3000).collect();
 
+        let prompt_body = match study_mode {
+            "exam" => "You are an exam prep assistant. Summarize the following notes into extremely direct, short exam answers with zero fluff. No intro/outro.",
+            "revision" => "You are a revision assistant. Summarize the following notes into bullet-style concise memory aids and quick revision facts. Extremely punchy.",
+            _ => "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).",
+        };
+
         return Ok(format!(
-            "You are a study assistant. Summarize the following notes into exactly 5 clear bullet points. Each bullet should be one concise sentence. Start each bullet with a dash (-).{}
+            "{}{}
 
 Notes:
 {}",
-            lang_suffix, truncated
+            prompt_body, lang_suffix, truncated
         ));
     }
 
@@ -781,8 +907,14 @@ Notes:
         }
         let truncated: String = trimmed_content.chars().take(3000).collect();
 
+        let difficulty_instruction = match difficulty {
+            "easy" => "The questions must be simple and easy, focusing on basic recall and literal facts from the notes.",
+            "hard" => "The questions must be advanced and hard, testing critical thinking, synthesis, and deep implications or complex details of the notes.",
+            _ => "The questions must be of moderate/medium difficulty, testing conceptual understanding and main ideas from the notes.",
+        };
+
         return Ok(format!(
-            "You are a student quiz generator. Based on the following notes, generate exactly 5 quiz questions with answers. Format each as:
+            "You are a student quiz generator. Based on the following notes, generate exactly 5 quiz questions with answers. {difficulty_instruction} Format each as:
 Q1: [question]
 A1: [answer]
 Q2: [question]
@@ -797,8 +929,13 @@ Notes:
 
     if let Some(topic) = &cli.quiz {
         let count = cli.count.unwrap_or(3);
+        let difficulty_instruction = match difficulty {
+            "easy" => "The questions must be simple and easy, testing basic facts and introductory concepts with straightforward options.",
+            "hard" => "The questions must be advanced and hard, testing deep analytical skills, complex scenarios, and edge cases with subtle and challenging distractors.",
+            _ => "The questions must be of moderate/medium difficulty, testing standard conceptual understanding and application.",
+        };
         return Ok(format!(
-            "Write {count} exam MCQs about '{topic}'. Use this exact format for each:
+            "Write {count} exam MCQs about '{topic}'. {difficulty_instruction} Use this exact format for each:
 Q1: [question text]
 a) [option]
 b) [option]
@@ -812,9 +949,14 @@ Only output the questions. No intro, no explanation.{}", lang_suffix
     }
 
     if let Some(prompt) = &cli.prompt {
+        let assistant_description = match study_mode {
+            "exam" => "You are Radhe AI, a tiny offline terminal assistant for students. Provide very short, direct answers with zero fluff.",
+            "revision" => "You are Radhe AI, a tiny offline terminal assistant for students. Respond using bullet-style concise memory aids.",
+            _ => "You are Radhe AI, a tiny offline terminal assistant for students. Be concise and practical.",
+        };
         return Ok(format!(
-            "You are Radhe AI, a tiny offline terminal assistant for students. Be concise and practical.{}
-User: {prompt}", lang_suffix
+            "{}{}
+User: {prompt}", assistant_description, lang_suffix
         ));
     }
 
@@ -1066,7 +1208,7 @@ fn init_dirs() -> Result<()> {
     Ok(())
 }
 
-fn run_doctor(active_model: &str, active_lang: &str) {
+fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_difficulty: &str) {
     use colored::Colorize;
 
     let version = env!("CARGO_PKG_VERSION");
@@ -1131,6 +1273,12 @@ fn run_doctor(active_model: &str, active_lang: &str) {
         println!("{}", format!("  Tip: Reset with --set-lang en").dimmed());
     }
 
+    // 6. Print study mode setting
+    println!("{}", format!("✓ Study Mode: {}", active_mode).green());
+
+    // 7. Print quiz difficulty setting
+    println!("{}", format!("✓ Quiz Difficulty: {}", active_difficulty).green());
+
     // 4. Print final status
     if all_ok {
         println!("{}", "All systems operational.".green());
@@ -1139,7 +1287,7 @@ fn run_doctor(active_model: &str, active_lang: &str) {
     }
 }
 
-fn run_repl(model: &str, lang: &str) -> Result<()> {
+fn run_repl(model: &str, lang: &str, _difficulty: &str, study_mode: &str) -> Result<()> {
     use colored::Colorize;
     use std::io::{self, BufRead, Write};
 
@@ -1243,14 +1391,23 @@ Task: {task_str}"
 
             if trimmed.starts_with("--explain ") {
                 let topic = trimmed["--explain ".len()..].trim();
-                let prompt = format!(
-                    "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
-                );
+                let prompt = match study_mode {
+                    "exam" => format!(
+                        "Explain '{topic}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
+                    ),
+                    "revision" => format!(
+                        "Explain '{topic}' for a beginner programmer using bullet-style concise memory aids and quick revision facts. Keep them extremely short and punchy.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                    ),
+                };
                 (prompt, "explain", 200)
             } else if trimmed.starts_with("--notes ") {
                 let topic = trimmed["--notes ".len()..].trim();
-                let prompt = format!(
-                    "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+                let prompt = match study_mode {
+                    "exam" => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Focus strictly on exam-relevant facts, direct and with zero fluff. Format strictly as:
 - [fact 1]
 - [fact 2]
 - [fact 3]
@@ -1258,12 +1415,41 @@ Task: {task_str}"
 - [fact 5]
 - [fact 6]
 Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
-                );
+                    ),
+                    "revision" => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Use bullet-style concise memory aids and quick revision facts that are extremely punchy. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                    ),
+                };
                 (prompt, "notes", 150)
             } else {
-                let prompt = format!(
-                    "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
-                );
+                let prompt = match study_mode {
+                    "exam" => format!(
+                        "Explain '{trimmed}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
+                    ),
+                    "revision" => format!(
+                        "Explain '{trimmed}' for a beginner programmer using bullet-style concise memory aids and quick revision facts. Keep them extremely short and punchy.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                    ),
+                };
                 (prompt, "explain", 200)
             }
         };
@@ -1562,7 +1748,7 @@ fn run_update() -> Result<()> {
     Ok(())
 }
 
-fn run_chat(active_model: &str, active_lang: &str) -> Result<()> {
+fn run_chat(active_model: &str, active_lang: &str, study_mode: &str) -> Result<()> {
     println!("Radhe AI - Chat Mode");
     println!("Type 'exit' to quit.");
     println!("──────────────────────");
@@ -1593,7 +1779,12 @@ fn run_chat(active_model: &str, active_lang: &str) -> Result<()> {
         } else {
             String::new()
         };
-        let mut prompt = format!("<|im_start|>system\nYou are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.{}<|im_end|>\n", lang_instruction);
+        let system_instruction = match study_mode {
+            "exam" => format!("You are Radhe, a concise AI assistant for students in EXAM mode. Give extremely short, direct answers with zero fluff. Answer questions directly without headers. Maximum 2 short sentences per response.{}", lang_instruction),
+            "revision" => format!("You are Radhe, a concise AI assistant for students in REVISION mode. Give answers using bullet-style concise memory aids. Keep them extremely brief and punchy.{}", lang_instruction),
+            _ => format!("You are Radhe, a concise AI assistant for students. Give short, direct answers. No bullet points unless asked. No headers. Maximum 3 sentences per response.{}", lang_instruction),
+        };
+        let mut prompt = format!("<|im_start|>system\n{}<|im_end|>\n", system_instruction);
         for (u, a) in &history {
             prompt.push_str(&format!("<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n{}<|im_end|>\n", u, a));
         }
@@ -1652,8 +1843,12 @@ mod tests {
             delete_pack: None,
             lang: None,
             set_lang: None,
+            mode: None,
+            difficulty: None,
+            set_mode: None,
+            set_difficulty: None,
         };
-        let p = build_prompt(&cli, "en").unwrap();
+        let p = build_prompt(&cli, "en", "medium", "normal").unwrap();
         assert!(p.contains("coding assistant"), "should contain coding assistant");
         assert!(p.contains("bubble sort in c"), "should contain prompt text");
     }
@@ -1681,8 +1876,12 @@ mod tests {
             delete_pack: None,
             lang: None,
             set_lang: None,
+            mode: None,
+            difficulty: None,
+            set_mode: None,
+            set_difficulty: None,
         };
-        let p = build_prompt(&cli, "en").unwrap();
+        let p = build_prompt(&cli, "en", "medium", "normal").unwrap();
         assert!(p.contains("Explain 'recursion' in exactly 5 bullet points"), "should format explanation prompt");
     }
 }
