@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use serde::Deserialize;
 use std::{
     fs,
     io::ErrorKind,
@@ -203,7 +202,7 @@ fn run_list_packs() -> Result<()> {
     Ok(())
 }
 
-#[derive(Deserialize, Default, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
 struct RadheConfig {
     model: Option<String>,
     max_tokens: Option<u32>,
@@ -308,6 +307,7 @@ enum Commands {
         reset: bool,
     },
     Shell,
+    Setup,
 }
 
 fn main() -> Result<()> {
@@ -612,6 +612,10 @@ max_tokens = 300
         }
         Some(Commands::Shell) => {
             run_power_shell(&active_model, &active_lang, &active_difficulty, &active_mode)?;
+            return Ok(());
+        }
+        Some(Commands::Setup) => {
+            run_setup(&config_path, &active_mode, &active_difficulty, &active_lang)?;
             return Ok(());
         }
         Some(Commands::Models) => {
@@ -1363,7 +1367,7 @@ fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_d
     }
 }
 
-fn run_repl(model: &str, lang: &str, _difficulty: &str, study_mode: &str) -> Result<()> {
+fn run_repl(model: &str, lang: &str, difficulty: &str, study_mode: &str) -> Result<()> {
     use colored::Colorize;
     use std::io::{self, BufRead, Write};
 
@@ -1375,9 +1379,25 @@ fn run_repl(model: &str, lang: &str, _difficulty: &str, study_mode: &str) -> Res
     .context("Error setting Ctrl-C handler")?;
 
     // Print welcome header
-    println!("{}", format!("Radhe AI v{} — Offline Terminal Assistant", env!("CARGO_PKG_VERSION")).cyan().bold());
-    println!("{}", "Type your question, or prefix with --code / --explain / --notes".yellow());
-    println!("{}", "/exit to quit, /clear to clear screen".yellow());
+    let version = env!("CARGO_PKG_VERSION");
+    let lang_label = match lang {
+        "hi" => "Hindi",
+        "hinglish" => "Hinglish",
+        _ => "English",
+    };
+    println!("{}", "╔══════════════════════════════════════════╗".cyan());
+    println!("{}", format!("║        Radhe AI v{} — Offline AI      ║", version).cyan());
+    println!("{}", "╚══════════════════════════════════════════╝".cyan());
+    println!(" {}   : {}", "Model".green(), model);
+    println!(" {}    : {}   {}", "Mode".green(), study_mode, "(change: --set-mode exam)".yellow());
+    println!(" {}: {}  {}", "Difficulty".green(), difficulty, "(change: --set-difficulty hard)".yellow());
+    println!(" {}: {}   {}", "Language".green(), lang_label, "(change: --set-lang hi)".yellow());
+    println!(" Commands you can use right now:");
+    println!("  {}   Explain a concept", "--explain <topic>".yellow());
+    println!("  {}     Study notes in bullets", "--notes <topic>".yellow());
+    println!("  {}       Generate code", "--code <task>".yellow());
+    println!("  {}               Quit  |  {}  Clear screen", "/exit".yellow(), "/clear".yellow());
+    println!("{}", "──────────────────────────────────────────".cyan());
     println!();
 
     let stdin = io::stdin();
@@ -1413,6 +1433,7 @@ fn run_repl(model: &str, lang: &str, _difficulty: &str, study_mode: &str) -> Res
         }
 
         // Parse input prefixes
+        let mut prefix_matched = true;
         let (prompt_text, mode, max_tokens) = if trimmed.starts_with("--code ") {
             let task = trimmed["--code ".len()..].trim();
             let has_lang_hint = task
@@ -1515,6 +1536,7 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
                 };
                 (prompt, "notes", 150)
             } else {
+                prefix_matched = false;
                 let prompt = match study_mode {
                     "exam" => format!(
                         "Explain '{trimmed}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
@@ -1546,6 +1568,14 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
                     let _ = save_stats(&stats_path, &stats);
                 }
                 println!("{output}");
+
+                if !prefix_matched {
+                    let word_count = trimmed.split_whitespace().count();
+                    if word_count < 4 {
+                        println!();
+                        println!("{}", "Tip: Use --explain <topic> for structured explanations, --notes <topic> for bullet points.".yellow());
+                    }
+                }
             }
             Err(e) => {
                 eprintln!("Error: {:?}", e);
@@ -1567,16 +1597,19 @@ fn run_power_shell(model: &str, lang: &str, initial_difficulty: &str, initial_mo
         std::process::exit(0);
     })
     .context("Error setting Ctrl-C handler")?;
-
-    // Print welcome header
-    println!("{}", format!("Radhe AI v{} — Power User Shell", env!("CARGO_PKG_VERSION")).cyan().bold());
-    println!("{}", "Type your question, or prefix with --code / --explain / --notes".yellow());
-    println!("{}", "Available meta-commands start with colon (:), type :help for details".yellow());
-    println!();
-
     let mut current_difficulty = initial_difficulty.to_string();
     let mut current_mode = initial_mode.to_string();
     let mut history: Vec<String> = Vec::new();
+
+    // Print welcome header
+    let version = env!("CARGO_PKG_VERSION");
+    println!("{}", "╔══════════════════════════════════════════╗".cyan());
+    println!("{}", format!("║      Radhe AI v{} — Power Shell       ║", version).cyan());
+    println!("{}", "╚══════════════════════════════════════════╝".cyan());
+    println!(" {}    : {}     {}: {}", "Mode".green(), current_mode, "Difficulty".green(), current_difficulty);
+    println!(" {}", "Type :help for all meta-commands".yellow());
+    println!("{}", "──────────────────────────────────────────".cyan());
+    println!();
 
     let stdin = io::stdin();
     let mut reader = stdin.lock();
@@ -2229,6 +2262,106 @@ fn load_stats(path: &std::path::Path) -> RadheStats {
 fn save_stats(path: &std::path::Path, stats: &RadheStats) -> Result<()> {
     let content = toml::to_string(stats)?;
     fs::write(path, content)?;
+    Ok(())
+}
+
+fn run_setup(config_path: &std::path::Path, current_mode: &str, current_difficulty: &str, current_lang: &str) -> Result<()> {
+    use std::io::{self, Write};
+    use colored::Colorize;
+
+    println!("{}", "Radhe AI Interactive Configuration Setup".cyan().bold());
+    println!();
+
+    // 1. Study Mode Selector
+    println!("{}", "┌─ Study Mode ────────────────────────────┐".cyan());
+    println!("│  1) {}   — full explanations        │", "normal".yellow());
+    println!("│  2) {}     — short, direct answers    │", "exam".yellow());
+    println!("│  3) {} — bullet memory aids       │", "revision".yellow());
+    println!("{}", "└─────────────────────────────────────────┘".cyan());
+
+    let mut selected_mode = current_mode.to_string();
+    loop {
+        print!("Select mode [1-3] (current: {}): ", current_mode);
+        io::stdout().flush().context("failed to flush stdout")?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        match trimmed {
+            "1" => { selected_mode = "normal".to_string(); break; }
+            "2" => { selected_mode = "exam".to_string(); break; }
+            "3" => { selected_mode = "revision".to_string(); break; }
+            _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+        }
+    }
+
+    // 2. Quiz Difficulty Selector
+    println!("{}", "┌─ Quiz Difficulty ───────────────────────┐".cyan());
+    println!("│  1) {}    — basic recall              │", "easy".yellow());
+    println!("│  2) {}  — conceptual understanding  │", "medium".yellow());
+    println!("│  3) {}    — critical thinking         │", "hard".yellow());
+    println!("{}", "└─────────────────────────────────────────┘".cyan());
+
+    let mut selected_diff = current_difficulty.to_string();
+    loop {
+        print!("Select difficulty [1-3] (current: {}): ", current_difficulty);
+        io::stdout().flush().context("failed to flush stdout")?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        match trimmed {
+            "1" => { selected_diff = "easy".to_string(); break; }
+            "2" => { selected_diff = "medium".to_string(); break; }
+            "3" => { selected_diff = "hard".to_string(); break; }
+            _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+        }
+    }
+
+    // 3. Language Selector
+    println!("{}", "┌─ Language ──────────────────────────────┐".cyan());
+    println!("│  1) {}       — English                  │", "en".yellow());
+    println!("│  2) {}       — Hindi (Devanagari)       │", "hi".yellow());
+    println!("│  3) {} — Hindi + English mix      │", "hinglish".yellow());
+    println!("{}", "└─────────────────────────────────────────┘".cyan());
+
+    let mut selected_lang = current_lang.to_string();
+    loop {
+        print!("Select language [1-3] (current: {}): ", current_lang);
+        io::stdout().flush().context("failed to flush stdout")?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).context("failed to read from stdin")?;
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        match trimmed {
+            "1" => { selected_lang = "en".to_string(); break; }
+            "2" => { selected_lang = "hi".to_string(); break; }
+            "3" => { selected_lang = "hinglish".to_string(); break; }
+            _ => println!("Invalid selection. Please choose 1, 2, or 3, or press Enter to keep current."),
+        }
+    }
+
+    let content = if config_path.exists() {
+        std::fs::read_to_string(config_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let mut config: RadheConfig = toml::from_str(&content).unwrap_or_default();
+    
+    config.mode = Some(selected_mode);
+    config.difficulty = Some(selected_diff);
+    config.lang = Some(selected_lang);
+
+    let updated_content = toml::to_string(&config)?;
+    std::fs::write(config_path, updated_content)?;
+
+    println!("{}", format!("✓ Config saved to {}", config_path.display()).green());
     Ok(())
 }
 
