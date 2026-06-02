@@ -1,49 +1,10 @@
 # Changelog
-## [v0.7.1] — 2026-06-02
-- feat: study modes (`--mode normal|exam|revision`) with `--set-mode` config persistence
-- feat: quiz difficulty (`--difficulty easy|medium|hard`) with `--set-difficulty` config persistence
-- feat: local analytics subcommand (`radhe stats`) tracking usage in `stats.toml`
-- feat: stats reset command (`radhe stats --reset`) with confirmation prompt
-- feat: pack deletion subcommand (`--delete-pack <name>`) with confirmation prompt
-- fix: dynamic runtime OS binary check and cross-platform self-update pipeline
-- fix: wired active language support into interactive REPL session mode
-
-## [v0.7.0] — 2026-05-27
-- feat: `--lang hi|hinglish` — response language mode (Hindi, Hinglish, English)
-- feat: `--set-lang <lang>` — persist default language in `config.toml`
-- feat: language mode in `radhe doctor` diagnostics
-- feat: VS Code extension `radhe.language` setting
-- feat: language support in `--chat`, `--pack`, and all prompt modes
-
-## [v0.6.0] — 2026-05-27
-- feat: `--pack <name>` — load subject packs for tuned responses
-- feat: `--list-packs` — show available subject packs
-- feat: `--create-pack` — interactive custom pack wizard
-- feat: `install.sh` — one-line Linux/macOS installer
-
-## [v0.5.0] — 2026-05-26
-- feat: `--quiz-file <file>` — generate quiz questions from student notes
-- feat: `--version` — print version and active model instantly
-- feat: enhanced `radhe doctor` — version header, active model validation, colored output
-- feat: `RADHE_DEBUG=1` env debug mode — logs prompts, paths, and raw output to stderr
-- fix: standardized all error messages to `Error/Hint` format with colored output
-- fix: strip UNC prefix from canonicalized paths on Windows
-- test: added 7 CLI smoke and unit tests
-## [v0.4.0] — 2026-05-26
-- feat: `--chat` persistent conversation mode with 6-turn rolling context window
-- feat: ChatML prompt format for Qwen instruct models
-- fix: context history passing across chat turns
-## [v0.3.0] — 2026-05-26
-- feat: `--summarize <file>` — summarize notes into 5 bullets
-- feat: `radhe update` — self-update to latest release
-- feat: upgraded default model to Qwen2.5-Coder 1.5B Instruct (Q4)
-- feat: `--quiz` interactive MCQ engine with score tracking
-- feat: `config.toml` configuration system
-- feat: `radhe models` — list installed GGUF models
-## [v0.1.0] — 2026-05-25
-- feat: core CLI with `--code`, `--explain`, `--notes`, `--fix`
-- feat: interactive REPL mode
-- feat: `radhe doctor` environment diagnostics
-- feat: `radhe init` directory setup
-- feat: Windows PowerShell installer (`install.ps1`)
-- feat: Linux bash installer (`install.sh`)
+## [0.7.1] — 2026-06-02
+### Added
+- Quiz difficulty levels (`--difficulty easy|medium|hard`, `--set-difficulty`)
+- Study modes (`--mode normal|exam|revision`, `--set-mode`)
+- Local usage analytics (`radhe stats`, `radhe stats --reset`)
+- Power user shell (`radhe shell`) with meta-commands and session history
+- `doctor` now reports active mode, difficulty, and shell availability
+## [0.7.0] — earlier
+- Initial public release
