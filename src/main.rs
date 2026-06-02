@@ -266,6 +266,10 @@ struct Cli {
     #[arg(long = "create-pack")]
     create_pack: bool,
 
+    /// Delete an installed subject pack
+    #[arg(long = "delete-pack", value_name = "NAME")]
+    delete_pack: Option<String>,
+
     /// Response language: 'en' (default), 'hi' (Hindi), 'hinglish' (mixed Hindi+English)
     #[arg(long = "lang", value_name = "LANG")]
     lang: Option<String>,
@@ -361,6 +365,36 @@ max_tokens = 300
 
     if cli.create_pack {
         run_create_pack();
+        return Ok(());
+    }
+
+    if let Some(ref pack_name) = cli.delete_pack {
+        // Sanitize name
+        if pack_name.chars().any(|c| !c.is_alphanumeric() && c != '_' && c != '-') {
+            eprintln!("{}: Invalid pack name '{}'.", "Error".red(), pack_name);
+            eprintln!("{}: Use only letters, numbers, underscores, and hyphens.", "Hint".yellow());
+            return Ok(());
+        }
+        let pack_path = find_pack(pack_name);
+        match pack_path {
+            None => {
+                eprintln!("{}: Pack '{}' not found.", "Error".red(), pack_name);
+                eprintln!("{}: Run 'radhe --list-packs' to see installed packs.", "Hint".yellow());
+            }
+            Some(path) => {
+                use std::io::{self, Write};
+                print!("Delete pack '{}' at {}? [y/N]: ", pack_name, path.display());
+                io::stdout().flush().ok();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).ok();
+                if confirm.trim().to_lowercase() == "y" {
+                    fs::remove_file(&path)?;
+                    println!("{}: Pack '{}' deleted.", "[Radhe]".green(), pack_name);
+                } else {
+                    println!("Aborted.");
+                }
+            }
+        }
         return Ok(());
     }
 
@@ -492,7 +526,7 @@ max_tokens = 300
         && !cli.chat;
 
     if is_repl {
-        run_repl(&active_model)?;
+        run_repl(&active_model, &active_lang)?;
         return Ok(());
     }
 
@@ -815,8 +849,14 @@ fn run_inference(prompt: &str, model: &str, max_tokens: u32, mode: &str) -> Resu
         format!("{}\n\n### RESPONSE:\n", prompt)
     };
 
+    let llama_bin = if cfg!(target_os = "windows") {
+        "llama-completion.exe"
+    } else {
+        "llama-completion"
+    };
+
     let max_tokens_str = max_tokens.to_string();
-    let child = Command::new("llama-completion.exe")
+    let child = Command::new(llama_bin)
         .args([
             "-m",
             &model_path,
@@ -1035,13 +1075,19 @@ fn run_doctor(active_model: &str, active_lang: &str) {
 
     let mut all_ok = true;
 
-    // 1. Check llama-completion.exe in PATH
-    match Command::new("llama-completion.exe").arg("--help").output() {
+    let llama_bin = if cfg!(target_os = "windows") {
+        "llama-completion.exe"
+    } else {
+        "llama-completion"
+    };
+
+    // 1. Check llama-completion in PATH
+    match Command::new(llama_bin).arg("--help").output() {
         Ok(_) => {
-            println!("{}", "✓ llama-completion.exe found".green());
+            println!("{}", format!("✓ {} found", llama_bin).green());
         }
         Err(_) => {
-            println!("{}", "✗ llama-completion.exe not found".red());
+            println!("{}", format!("✗ {} not found", llama_bin).red());
             all_ok = false;
         }
     }
@@ -1093,7 +1139,7 @@ fn run_doctor(active_model: &str, active_lang: &str) {
     }
 }
 
-fn run_repl(model: &str) -> Result<()> {
+fn run_repl(model: &str, lang: &str) -> Result<()> {
     use colored::Colorize;
     use std::io::{self, BufRead, Write};
 
@@ -1188,30 +1234,38 @@ fn run_repl(model: &str) -> Result<()> {
 Task: {task_str}"
             );
             (prompt, "code", 300)
-        } else if trimmed.starts_with("--explain ") {
-            let topic = trimmed["--explain ".len()..].trim();
-            let prompt = format!(
-                "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:"
-            );
-            (prompt, "explain", 200)
-        } else if trimmed.starts_with("--notes ") {
-            let topic = trimmed["--notes ".len()..].trim();
-            let prompt = format!(
-                "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+        } else {
+            let lang_suffix = if lang != "en" {
+                format!("\n\n{}", lang_system_prompt(lang))
+            } else {
+                String::new()
+            };
+
+            if trimmed.starts_with("--explain ") {
+                let topic = trimmed["--explain ".len()..].trim();
+                let prompt = format!(
+                    "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                );
+                (prompt, "explain", 200)
+            } else if trimmed.starts_with("--notes ") {
+                let topic = trimmed["--notes ".len()..].trim();
+                let prompt = format!(
+                    "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
 - [fact 1]
 - [fact 2]
 - [fact 3]
 - [fact 4]
 - [fact 5]
 - [fact 6]
-Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph."
-            );
-            (prompt, "notes", 150)
-        } else {
-            let prompt = format!(
-                "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:"
-            );
-            (prompt, "explain", 200)
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                );
+                (prompt, "notes", 150)
+            } else {
+                let prompt = format!(
+                    "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                );
+                (prompt, "explain", 200)
+            }
         };
 
         // Call run_inference
@@ -1395,17 +1449,22 @@ fn run_models(active_model: &str) -> Result<()> {
 
 fn run_update() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
-
     println!("Checking for updates...");
-
-    let ps_output = Command::new("powershell")
-        .args([
-            "-Command",
-            "Invoke-RestMethod -Uri 'https://api.github.com/repos/DevWizard-Vandan/radhe-ai/releases/latest' | Select-Object -ExpandProperty tag_name"
-        ])
-        .output();
-
-    let output = match ps_output {
+    // Fetch latest version tag from GitHub API
+    let api_url = "https://api.github.com/repos/DevWizard-Vandan/radhe-ai/releases/latest";
+    let latest_tag_output = if cfg!(target_os = "windows") {
+        Command::new("powershell")
+            .args(["-Command", &format!(
+                "Invoke-RestMethod -Uri '{}' | Select-Object -ExpandProperty tag_name", api_url
+            )])
+            .output()
+    } else {
+        Command::new("curl")
+            .args(["-fsSL", "-H", "Accept: application/vnd.github+json",
+                   "-H", "X-GitHub-Api-Version: 2022-11-28", api_url])
+            .output()
+    };
+    let output = match latest_tag_output {
         Ok(out) => out,
         Err(_) => {
             eprintln!("{}: Could not reach GitHub API.", "Error".red());
@@ -1413,69 +1472,93 @@ fn run_update() -> Result<()> {
             std::process::exit(1);
         }
     };
-
     if !output.status.success() {
         eprintln!("{}: Could not reach GitHub API.", "Error".red());
         eprintln!("{}: Check your internet connection and try again.", "Hint".yellow());
         std::process::exit(1);
     }
-
     let stdout_str = String::from_utf8_lossy(&output.stdout);
-    let mut latest_version = stdout_str.trim().to_string();
+    // On Linux/macOS, parse tag_name from JSON using basic string search
+    let mut latest_version = if cfg!(target_os = "windows") {
+        stdout_str.trim().to_string()
+    } else {
+        // Parse "tag_name":"v0.7.0" from JSON
+        let json = stdout_str.trim();
+        let key = "\"tag_name\":\"";
+        if let Some(start) = json.find(key) {
+            let rest = &json[start + key.len()..];
+            if let Some(end) = rest.find('"') {
+                rest[..end].to_string()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    };
     if latest_version.starts_with('v') {
         latest_version = latest_version[1..].to_string();
     }
-
-    debug_log(&format!("Latest version from API: {}", latest_version));
-
     if latest_version.is_empty() {
-        eprintln!("{}: Could not reach GitHub API.", "Error".red());
-        eprintln!("{}: Check your internet connection and try again.", "Hint".yellow());
+        eprintln!("{}: Could not parse latest version from GitHub API.", "Error".red());
+        eprintln!("{}: Try again later or check github.com/DevWizard-Vandan/radhe-ai/releases", "Hint".yellow());
         std::process::exit(1);
     }
-
+    debug_log(&format!("Latest version from API: {}", latest_version));
     if current_version == latest_version {
-        println!("Radhe AI is already up to date (v{current_version})");
+        println!("Radhe AI is already up to date (v{})", current_version);
         return Ok(());
     }
-
-    println!("Update available: v{current_version} → v{latest_version}");
+    println!("Update available: v{} → v{}", current_version, latest_version);
     println!("Downloading new binary...");
-
     let current_exe = std::env::current_exe()?;
     let exe_dir = current_exe.parent().context("failed to get current exe directory")?;
-    let new_exe_path = exe_dir.join("radhe_new.exe");
-    let new_exe_path_str = new_exe_path.to_string_lossy().to_string();
-
-    let download_url = "https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/radhe.exe";
-    let download_status = Command::new("powershell")
-        .args([
-            "-Command",
-            &format!("Invoke-WebRequest -Uri '{}' -OutFile '{}'", download_url, new_exe_path_str)
-        ])
-        .output();
-
-    let download_success = match download_status {
-        Ok(out) => out.status.success(),
-        Err(_) => false,
+    let (new_exe_name, download_filename) = if cfg!(target_os = "windows") {
+        ("radhe_new.exe", "radhe.exe")
+    } else {
+        ("radhe_new", "radhe")
     };
-
+    let new_exe_path = exe_dir.join(new_exe_name);
+    let new_exe_path_str = new_exe_path.to_string_lossy().to_string();
+    let download_url = format!(
+        "https://github.com/DevWizard-Vandan/radhe-ai/releases/latest/download/{}",
+        download_filename
+    );
+    let download_success = if cfg!(target_os = "windows") {
+        Command::new("powershell")
+            .args(["-Command", &format!(
+                "Invoke-WebRequest -Uri '{}' -OutFile '{}'", download_url, new_exe_path_str
+            )])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    } else {
+        Command::new("curl")
+            .args(["-fsSL", "-o", &new_exe_path_str, &download_url])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    };
     if !download_success {
         eprintln!("{}: Failed to download new binary.", "Error".red());
         eprintln!("{}: Try again later or download manually from github.com/DevWizard-Vandan/radhe-ai/releases", "Hint".yellow());
         std::process::exit(1);
     }
-
-    // Replace the current binary
-    let old_exe_path = exe_dir.join("radhe_old.exe");
-    if old_exe_path.exists() {
-        let _ = fs::remove_file(&old_exe_path);
+    // Make executable on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&new_exe_path)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&new_exe_path, perms)?;
     }
-
-    fs::rename(&current_exe, &old_exe_path).context("failed to rename current binary to radhe_old.exe")?;
-    fs::rename(&new_exe_path, &current_exe).context("failed to rename radhe_new.exe to radhe.exe")?;
-
-    println!("Radhe AI updated to v{latest_version}! Restart your terminal.");
+    // Replace binary
+    let old_suffix = if cfg!(target_os = "windows") { "radhe_old.exe" } else { "radhe_old" };
+    let old_exe_path = exe_dir.join(old_suffix);
+    if old_exe_path.exists() { let _ = fs::remove_file(&old_exe_path); }
+    fs::rename(&current_exe, &old_exe_path).context("failed to rename current binary")?;
+    fs::rename(&new_exe_path, &current_exe).context("failed to rename new binary")?;
+    println!("Radhe AI updated to v{}! Restart your terminal.", latest_version);
     Ok(())
 }
 
@@ -1566,6 +1649,7 @@ mod tests {
             pack: None,
             list_packs: false,
             create_pack: false,
+            delete_pack: None,
             lang: None,
             set_lang: None,
         };
@@ -1594,6 +1678,7 @@ mod tests {
             pack: None,
             list_packs: false,
             create_pack: false,
+            delete_pack: None,
             lang: None,
             set_lang: None,
         };
