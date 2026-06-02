@@ -307,6 +307,7 @@ enum Commands {
         #[arg(long)]
         reset: bool,
     },
+    Shell,
 }
 
 fn main() -> Result<()> {
@@ -607,6 +608,10 @@ max_tokens = 300
         }
         Some(Commands::Doctor) => {
             run_doctor(&active_model, &active_lang, &active_mode, &active_difficulty);
+            return Ok(());
+        }
+        Some(Commands::Shell) => {
+            run_power_shell(&active_model, &active_lang, &active_difficulty, &active_mode)?;
             return Ok(());
         }
         Some(Commands::Models) => {
@@ -1347,6 +1352,9 @@ fn run_doctor(active_model: &str, active_lang: &str, active_mode: &str, active_d
     // 7. Print quiz difficulty setting
     println!("{}", format!("✓ Quiz Difficulty: {}", active_difficulty).green());
 
+    // 8. Print shell availability
+    println!("{}", "✓ Shell: available".green());
+
     // 4. Print final status
     if all_ok {
         println!("{}", "All systems operational.".green());
@@ -1508,6 +1516,301 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
                 (prompt, "notes", 150)
             } else {
                 let prompt = match study_mode {
+                    "exam" => format!(
+                        "Explain '{trimmed}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
+                    ),
+                    "revision" => format!(
+                        "Explain '{trimmed}' for a beginner programmer using bullet-style concise memory aids and quick revision facts. Keep them extremely short and punchy.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Explain '{trimmed}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                    ),
+                };
+                (prompt, "explain", 200)
+            }
+        };
+
+        // Call run_inference
+        match run_inference(&prompt_text, model, max_tokens, mode) {
+            Ok(output) => {
+                if let Some(home) = dirs::home_dir() {
+                    let stats_path = home.join(".radhe").join("stats.toml");
+                    let mut stats = load_stats(&stats_path);
+                    stats.total_commands += 1;
+                    match mode {
+                        "code" => stats.code_count += 1,
+                        "explain" => stats.explain_count += 1,
+                        "notes" => stats.notes_count += 1,
+                        _ => {}
+                    }
+                    let _ = save_stats(&stats_path, &stats);
+                }
+                println!("{output}");
+            }
+            Err(e) => {
+                eprintln!("Error: {:?}", e);
+            }
+        }
+        println!();
+    }
+
+    Ok(())
+}
+
+fn run_power_shell(model: &str, lang: &str, initial_difficulty: &str, initial_mode: &str) -> Result<()> {
+    use colored::Colorize;
+    use std::io::{self, BufRead, Write};
+
+    // Set up Ctrl+C handler with a friendly cyan/yellow exit message
+    ctrlc::set_handler(move || {
+        println!("\n\n{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+        std::process::exit(0);
+    })
+    .context("Error setting Ctrl-C handler")?;
+
+    // Print welcome header
+    println!("{}", format!("Radhe AI v{} — Power User Shell", env!("CARGO_PKG_VERSION")).cyan().bold());
+    println!("{}", "Type your question, or prefix with --code / --explain / --notes".yellow());
+    println!("{}", "Available meta-commands start with colon (:), type :help for details".yellow());
+    println!();
+
+    let mut current_difficulty = initial_difficulty.to_string();
+    let mut current_mode = initial_mode.to_string();
+    let mut history: Vec<String> = Vec::new();
+
+    let stdin = io::stdin();
+    let mut reader = stdin.lock();
+
+    loop {
+        // Feature 1: Prompt prefix radhe [mode/difficulty] › _
+        print!("{} [{}/{}] {} ", 
+            "radhe".green().bold(), 
+            current_mode.cyan(), 
+            current_difficulty.magenta(), 
+            "›".yellow().bold()
+        );
+        io::stdout().flush().context("failed to flush stdout")?;
+
+        let mut input = String::new();
+        let bytes_read = reader.read_line(&mut input).context("failed to read from stdin")?;
+        
+        if bytes_read == 0 {
+            println!("\n{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+            break;
+        }
+
+        let mut trimmed = input.trim();
+        if trimmed.starts_with('\u{feff}') {
+            trimmed = trimmed.strip_prefix('\u{feff}').unwrap_or(trimmed);
+        }
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Add to history
+        history.push(trimmed.to_string());
+
+        // Feature 2: Meta-commands with colon prefix
+        if trimmed.starts_with(':') {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            let cmd = parts[0];
+
+            match cmd {
+                ":mode" => {
+                    println!("Current mode: {}", current_mode);
+                }
+                ":difficulty" => {
+                    println!("Current difficulty: {}", current_difficulty);
+                }
+                ":set-mode" => {
+                    if parts.len() < 2 {
+                        println!("Usage: :set-mode <normal|exam|revision>");
+                    } else {
+                        let new_mode = parts[1].to_lowercase();
+                        if ["normal", "exam", "revision"].contains(&new_mode.as_str()) {
+                            current_mode = new_mode;
+                            println!("Session study mode changed to: {}", current_mode);
+                        } else {
+                            println!("{}: Invalid study mode '{}'. Valid options: normal, exam, revision", "Error".red(), parts[1]);
+                        }
+                    }
+                }
+                ":set-difficulty" => {
+                    if parts.len() < 2 {
+                        println!("Usage: :set-difficulty <easy|medium|hard>");
+                    } else {
+                        let new_diff = parts[1].to_lowercase();
+                        if ["easy", "medium", "hard"].contains(&new_diff.as_str()) {
+                            current_difficulty = new_diff;
+                            println!("Session quiz difficulty changed to: {}", current_difficulty);
+                        } else {
+                            println!("{}: Invalid quiz difficulty '{}'. Valid options: easy, medium, hard", "Error".red(), parts[1]);
+                        }
+                    }
+                }
+                ":stats" => {
+                    if let Some(home) = dirs::home_dir() {
+                        let stats_path = home.join(".radhe").join("stats.toml");
+                        let stats = load_stats(&stats_path);
+                        println!("Radhe AI — Usage Stats");
+                        println!("─────────────────────────────");
+                        println!("Total commands run : {}", stats.total_commands);
+                        println!("Explains           : {}", stats.explain_count);
+                        println!("Code generations   : {}", stats.code_count);
+                        println!("Quizzes            : {}", stats.quiz_count);
+                        println!("Notes              : {}", stats.notes_count);
+                        println!("Summaries          : {}", stats.summarize_count);
+                        println!("Chats              : {}", stats.chat_count);
+                        if !stats.pack_usage.is_empty() {
+                            println!("Pack usage:");
+                            let mut sorted_packs: Vec<(&String, &u64)> = stats.pack_usage.iter().collect();
+                            sorted_packs.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+                            for (pack, count) in sorted_packs {
+                                println!("  {:<8}: {}", pack, count);
+                            }
+                        }
+                    } else {
+                        println!("Error: Unable to load stats path.");
+                    }
+                }
+                ":clear" => {
+                    print!("\x1B[2J\x1B[1;1H");
+                    io::stdout().flush().ok();
+                }
+                ":help" => {
+                    println!("{}", "Available Meta-Commands:".cyan().bold());
+                    println!("  {:20} — prints current mode", ":mode");
+                    println!("  {:20} — prints current difficulty", ":difficulty");
+                    println!("  {:20} — changes mode for session (no disk write)", ":set-mode <normal|exam|revision>");
+                    println!("  {:20} — changes difficulty for session (no disk write)", ":set-difficulty <easy|medium|hard>");
+                    println!("  {:20} — prints the same table as radhe stats", ":stats");
+                    println!("  {:20} — clears terminal screen", ":clear");
+                    println!("  {:20} — prints last 20 entries numbered", ":history");
+                    println!("  {:20} — prints all available meta-commands", ":help");
+                    println!("  {:20} — exits the shell", ":quit / :exit");
+                }
+                ":quit" | ":exit" => {
+                    println!("{}", "Goodbye! Hope Radhe AI helped you today!".cyan().bold());
+                    break;
+                }
+                ":history" => {
+                    let start = if history.len() > 20 { history.len() - 20 } else { 0 };
+                    for (i, entry) in history.iter().skip(start).enumerate() {
+                        println!("{}: {}", i + 1, entry);
+                    }
+                }
+                _ => {
+                    println!("{}: Unknown meta-command '{}'. Type :help for a list of commands.", "Error".red(), cmd);
+                }
+            }
+            println!();
+            continue;
+        }
+
+        // Regular inputs: LLM execution
+        let (prompt_text, mode, max_tokens) = if trimmed.starts_with("--code ") {
+            let task = trimmed["--code ".len()..].trim();
+            let has_lang_hint = task
+                .to_lowercase()
+                .split(|c: char| !c.is_alphanumeric() && c != '+' && c != '#')
+                .any(|word| {
+                    matches!(
+                        word,
+                        "c" | "c++"
+                            | "cpp"
+                            | "c#"
+                            | "csharp"
+                            | "rust"
+                            | "python"
+                            | "java"
+                            | "javascript"
+                            | "js"
+                            | "typescript"
+                            | "ts"
+                            | "go"
+                            | "golang"
+                            | "ruby"
+                            | "php"
+                            | "swift"
+                            | "kotlin"
+                            | "bash"
+                            | "shell"
+                            | "powershell"
+                            | "sql"
+                            | "html"
+                            | "css"
+                            | "assembly"
+                    )
+                });
+
+            let mut task_str = task.to_string();
+            if has_lang_hint {
+                task_str.push_str(", respect the exact language specified.");
+            }
+
+            let prompt = format!(
+                "You are a coding assistant. Return ONLY valid compilable code with zero explanation. No markdown, no backticks, no comments. Just raw code.
+Task: {task_str}"
+            );
+            (prompt, "code", 300)
+        } else {
+            let lang_suffix = if lang != "en" {
+                format!("\n\n{}", lang_system_prompt(lang))
+            } else {
+                String::new()
+            };
+
+            if trimmed.starts_with("--explain ") {
+                let topic = trimmed["--explain ".len()..].trim();
+                let prompt = match current_mode.as_str() {
+                    "exam" => format!(
+                        "Explain '{topic}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
+                    ),
+                    "revision" => format!(
+                        "Explain '{topic}' for a beginner programmer using bullet-style concise memory aids and quick revision facts. Keep them extremely short and punchy.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Explain '{topic}' in exactly 5 bullet points for a beginner programmer. Each bullet must be one sentence. Stop after 5 bullets. Do not repeat yourself.\n\nExplanation:{lang_suffix}"
+                    ),
+                };
+                (prompt, "explain", 200)
+            } else if trimmed.starts_with("--notes ") {
+                let topic = trimmed["--notes ".len()..].trim();
+                let prompt = match current_mode.as_str() {
+                    "exam" => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Focus strictly on exam-relevant facts, direct and with zero fluff. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                    ),
+                    "revision" => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Use bullet-style concise memory aids and quick revision facts that are extremely punchy. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                    ),
+                    _ => format!(
+                        "Give exactly 6 bullet points about '{topic}' for a student. Format strictly as:
+- [fact 1]
+- [fact 2]
+- [fact 3]
+- [fact 4]
+- [fact 5]
+- [fact 6]
+Each bullet = one unique fact. Max 15 words per bullet. Start directly with the first bullet, no intro paragraph.{lang_suffix}"
+                    ),
+                };
+                (prompt, "notes", 150)
+            } else {
+                let prompt = match current_mode.as_str() {
                     "exam" => format!(
                         "Explain '{trimmed}' for a beginner programmer. Provide very short, direct, exam-focused answers with zero fluff. Stop after 3 sentences.{lang_suffix}"
                     ),

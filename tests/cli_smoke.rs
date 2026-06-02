@@ -19,6 +19,7 @@ fn test_doctor_subcommand() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Radhe AI v"), "doctor should print version header");
     assert!(stdout.contains("diagnostics"), "doctor should mention diagnostics");
+    assert!(stdout.contains("Shell: available"), "doctor should print shell availability status");
     assert!(output.status.success());
 }
 
