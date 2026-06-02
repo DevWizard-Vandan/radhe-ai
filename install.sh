@@ -36,12 +36,40 @@ tar -xzf /tmp/llama.tar.gz -C /tmp/llama_extract
 find /tmp/llama_extract -name "llama-cli" -o -name "llama-completion" | xargs -I{} cp {} "$BIN_DIR/" 2>/dev/null || true
 find /tmp/llama_extract -name "*.so" | xargs -I{} cp {} "$BIN_DIR/" 2>/dev/null || true
 rm -rf /tmp/llama.tar.gz /tmp/llama_extract
-# 4. Download Qwen2.5-Coder 1.5B model
-MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
-MODEL_DEST="$MODELS_DIR/Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
-echo "Downloading Qwen2.5-Coder 1.5B model (~1GB)..."
-curl -L "$MODEL_URL" -o "$MODEL_DEST"
-# 5. Add BIN_DIR to PATH in shell config
+# 4. Download default AI model
+echo ""
+echo "Select a default AI model to download:"
+echo "  1) Low reasoning, but small, yet effective model (~398MB)"
+echo "  2) High reasoning, but large model (~1GB) [Recommended]"
+read -p "Enter choice [1-2] (default: 2): " MODEL_CHOICE
+
+# Default to 2 if empty or invalid
+if [ "$MODEL_CHOICE" != "1" ] && [ "$MODEL_CHOICE" != "2" ]; then
+  MODEL_CHOICE="2"
+fi
+
+if [ "$MODEL_CHOICE" = "1" ]; then
+  MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
+  MODEL_FILE="qwen2.5-coder-0.5b-instruct-q4_k_m.gguf"
+  echo "Downloading Qwen2.5-Coder 0.5B model (~398MB)..."
+else
+  MODEL_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+  MODEL_FILE="Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
+  echo "Downloading Qwen2.5-Coder 1.5B model (~1GB)..."
+fi
+
+MODEL_DEST="$MODELS_DIR/$MODEL_FILE"
+curl -fL "$MODEL_URL" -o "$MODEL_DEST"
+
+# 5. Create config.toml with active model choice
+mkdir -p "$HOME/.radhe"
+cat <<EOF > "$HOME/.radhe/config.toml"
+# Radhe AI Configuration
+# Change model to use a different GGUF file from ~/.radhe/models/
+model = "$MODEL_FILE"
+max_tokens = 300
+EOF
+# 6. Add BIN_DIR to PATH in shell config
 SHELL_RC="$HOME/.bashrc"
 if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ] || [ "$SHELL" = "/usr/bin/zsh" ]; then
   SHELL_RC="$HOME/.zshrc"

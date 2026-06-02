@@ -1068,8 +1068,9 @@ fn run_doctor(active_model: &str, active_lang: &str) {
         all_ok = false;
     }
 
-    // 3. Model warning if not default 1.5B
-    if active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf" && active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M" {
+    // 3. Model warning if not default
+    if active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf" && active_model != "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M"
+        && active_model != "qwen2.5-coder-0.5b-instruct-q4_k_m.gguf" && active_model != "qwen2.5-coder-0.5b-instruct-q4_k_m" {
         println!("{}", format!("! Warning: Using non-default model ({})", active_model).yellow());
     }
 
