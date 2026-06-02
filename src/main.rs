@@ -303,6 +303,10 @@ enum Commands {
     Doctor,
     Models,
     Update,
+    Stats {
+        #[arg(long)]
+        reset: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -583,6 +587,13 @@ max_tokens = 300
 
         let output = run_inference(&prompt, &active_model, max_tokens, "chat")
             .context("failed to run local inference")?;
+
+        let stats_path = config_dir.join("stats.toml");
+        let mut stats = load_stats(&stats_path);
+        stats.total_commands += 1;
+        *stats.pack_usage.entry(pack_name.to_lowercase()).or_insert(0) += 1;
+        let _ = save_stats(&stats_path, &stats);
+
         println!("{}", output);
         return Ok(());
     }
@@ -604,6 +615,44 @@ max_tokens = 300
         }
         Some(Commands::Update) => {
             run_update()?;
+            return Ok(());
+        }
+        Some(Commands::Stats { reset }) => {
+            let stats_path = config_dir.join("stats.toml");
+            if reset {
+                use std::io::{self, Write};
+                print!("Wipe all local usage statistics? [y/N]: ");
+                io::stdout().flush().ok();
+                let mut confirm = String::new();
+                io::stdin().read_line(&mut confirm).ok();
+                if confirm.trim().to_lowercase() == "y" {
+                    if stats_path.exists() {
+                        fs::remove_file(&stats_path)?;
+                    }
+                    println!("Statistics wiped.");
+                } else {
+                    println!("Aborted.");
+                }
+            } else {
+                let stats = load_stats(&stats_path);
+                println!("Radhe AI — Usage Stats");
+                println!("─────────────────────────────");
+                println!("Total commands run : {}", stats.total_commands);
+                println!("Explains           : {}", stats.explain_count);
+                println!("Code generations   : {}", stats.code_count);
+                println!("Quizzes            : {}", stats.quiz_count);
+                println!("Notes              : {}", stats.notes_count);
+                println!("Summaries          : {}", stats.summarize_count);
+                println!("Chats              : {}", stats.chat_count);
+                if !stats.pack_usage.is_empty() {
+                    println!("Pack usage:");
+                    let mut sorted_packs: Vec<(&String, &u64)> = stats.pack_usage.iter().collect();
+                    sorted_packs.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+                    for (pack, count) in sorted_packs {
+                        println!("  {:<8}: {}", pack, count);
+                    }
+                }
+            }
             return Ok(());
         }
         None => {}
@@ -645,6 +694,12 @@ max_tokens = 300
     };
 
     if mode == "chat" {
+        let stats_path = config_dir.join("stats.toml");
+        let mut stats = load_stats(&stats_path);
+        stats.total_commands += 1;
+        stats.chat_count += 1;
+        let _ = save_stats(&stats_path, &stats);
+
         run_chat(&active_model, &active_lang, &active_mode)?;
         return Ok(());
     }
@@ -685,6 +740,19 @@ max_tokens = 300
 
     let output = run_inference(&prompt, &active_model, max_tokens, mode)
         .context("failed to run local inference")?;
+
+    let stats_path = config_dir.join("stats.toml");
+    let mut stats = load_stats(&stats_path);
+    stats.total_commands += 1;
+    match mode {
+        "code" => stats.code_count += 1,
+        "explain" => stats.explain_count += 1,
+        "notes" => stats.notes_count += 1,
+        "quiz" | "quiz_file" => stats.quiz_count += 1,
+        "summarize" => stats.summarize_count += 1,
+        _ => {}
+    }
+    let _ = save_stats(&stats_path, &stats);
 
     if mode == "quiz" {
         run_quiz(&output);
@@ -1457,6 +1525,18 @@ Each bullet = one unique fact. Max 15 words per bullet. Start directly with the 
         // Call run_inference
         match run_inference(&prompt_text, model, max_tokens, mode) {
             Ok(output) => {
+                if let Some(home) = dirs::home_dir() {
+                    let stats_path = home.join(".radhe").join("stats.toml");
+                    let mut stats = load_stats(&stats_path);
+                    stats.total_commands += 1;
+                    match mode {
+                        "code" => stats.code_count += 1,
+                        "explain" => stats.explain_count += 1,
+                        "notes" => stats.notes_count += 1,
+                        _ => {}
+                    }
+                    let _ = save_stats(&stats_path, &stats);
+                }
                 println!("{output}");
             }
             Err(e) => {
@@ -1813,6 +1893,39 @@ fn run_chat(active_model: &str, active_lang: &str, study_mode: &str) -> Result<(
         println!("{}", response);
         println!();
     }
+    Ok(())
+}#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
+struct RadheStats {
+    #[serde(default)]
+    total_commands: u64,
+    #[serde(default)]
+    explain_count: u64,
+    #[serde(default)]
+    code_count: u64,
+    #[serde(default)]
+    quiz_count: u64,
+    #[serde(default)]
+    notes_count: u64,
+    #[serde(default)]
+    summarize_count: u64,
+    #[serde(default)]
+    chat_count: u64,
+    #[serde(default)]
+    pack_usage: std::collections::BTreeMap<String, u64>,
+}
+
+fn load_stats(path: &std::path::Path) -> RadheStats {
+    if path.exists() {
+        let content = fs::read_to_string(path).unwrap_or_default();
+        toml::from_str(&content).unwrap_or_default()
+    } else {
+        RadheStats::default()
+    }
+}
+
+fn save_stats(path: &std::path::Path, stats: &RadheStats) -> Result<()> {
+    let content = toml::to_string(stats)?;
+    fs::write(path, content)?;
     Ok(())
 }
 
